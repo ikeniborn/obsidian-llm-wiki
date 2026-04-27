@@ -3,8 +3,8 @@
   "name": "LLM Wiki",
   "version": "0.1.0",
   "minAppVersion": "1.0.0",
-  "description": "Run llm-wiki skill via iclaude, display progress in a side panel",
+  "description": "AI-powered compoundable knowledge base — extracts, synthesizes and maintains a wiki from raw sources directly inside Obsidian",
   "author": "ikeniborn",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/ikeniborn",
   "isDesktopOnly": true
 }
