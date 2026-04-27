@@ -127,6 +127,16 @@ export class WikiController {
 
     try {
       for await (const ev of runner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs })) {
+        if (ev.kind === "ask_user") {
+          view.appendEvent(ev);
+          try {
+            const answer = await view.showQuestionModal(ev.question, ev.options);
+            runner.sendToolResult(ev.toolUseId, answer);
+          } catch {
+            ctrl.abort();
+          }
+          continue;
+        }
         view.appendEvent(ev);
         this.collectStep(ev, steps);
         if (ev.kind === "result") finalText = ev.text;
