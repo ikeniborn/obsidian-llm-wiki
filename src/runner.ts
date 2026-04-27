@@ -21,8 +21,8 @@ export class IclaudeRunner {
 
   constructor(private cfg: RunnerConfig) {}
 
-  sendToolResult(toolUseId: string, answer: string): void {
-    if (!this.stdin || this.stdin.destroyed) return;
+  sendToolResult(toolUseId: string, answer: string): boolean {
+    if (!this.stdin || this.stdin.destroyed) return false;
     const payload = JSON.stringify({
       type: "user",
       message: {
@@ -31,9 +31,14 @@ export class IclaudeRunner {
       },
     });
     this.stdin.write(payload + "\n");
+    return true;
   }
 
   async *run(req: RunRequest): AsyncGenerator<RunEvent, void, void> {
+    if (this.stdin !== null) {
+      throw new Error("IclaudeRunner: concurrent run() calls are not supported");
+    }
+
     const prompt = buildPrompt({ operation: req.operation, args: req.args });
     const claudeArgs: string[] = [
       "--",
@@ -54,11 +59,14 @@ export class IclaudeRunner {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
+    if (!child.stdout || !child.stderr || !child.stdin) {
+      throw new Error("spawn did not open expected stdio pipes");
+    }
     this.stdin = child.stdin;
 
     const stderrBuf: Buffer[] = [];
     let stderrBytes = 0;
-    child.stderr!.on("data", (chunk: Buffer) => {
+    child.stderr.on("data", (chunk: Buffer) => {
       stderrBytes += chunk.length;
       stderrBuf.push(chunk);
       while (stderrBytes > STDERR_BUFFER_BYTES && stderrBuf.length > 1) {
@@ -78,7 +86,12 @@ export class IclaudeRunner {
     else req.signal.addEventListener("abort", onAbort, { once: true });
 
     const timeoutHandle = setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGTERM");
+      if (child.exitCode === null) {
+        child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
+        }, SIGTERM_GRACE_MS);
+      }
     }, req.timeoutMs);
 
     const queue: RunEvent[] = [];
@@ -90,7 +103,7 @@ export class IclaudeRunner {
       }
     };
 
-    const rl = createInterface({ input: child.stdout! });
+    const rl = createInterface({ input: child.stdout });
     rl.on("line", (line) => {
       const ev = parseStreamLine(line);
       if (ev) queue.push(ev);

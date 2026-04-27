@@ -17,6 +17,11 @@ done < "$PRE_FIXTURE"
 # Ждём tool_result от stdin (одна строка JSON)
 IFS= read -r _tool_result || true
 
+# Emit confirmation if we got actual content (not just EOF)
+if [[ -n "$_tool_result" ]]; then
+  printf '{"type":"system","subtype":"got_answer"}\n'
+fi
+
 # Phase 2: выдать строки post-фикстуры
 while IFS= read -r line || [[ -n "$line" ]]; do
   printf '%s\n' "$line"

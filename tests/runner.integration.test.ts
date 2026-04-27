@@ -93,11 +93,13 @@ describe("IclaudeRunner (integration)", () => {
     })) {
       events.push(ev);
       if (ev.kind === "ask_user") {
-        runner.sendToolResult(ev.toolUseId, "подтвердить");
+        const ok = runner.sendToolResult(ev.toolUseId, "подтвердить");
+        expect(ok).toBe(true);
       }
     }
 
     expect(events.some(e => e.kind === "ask_user")).toBe(true);
+    expect(events.some(e => e.kind === "system" && (e as Extract<RunEvent, { kind: "system" }>).message === "got_answer")).toBe(true);
     const askEv = events.find(e => e.kind === "ask_user") as Extract<RunEvent, { kind: "ask_user" }>;
     expect(askEv.question).toBe("Подтвердить конфигурацию?");
     expect(askEv.options).toEqual(["подтвердить", "отменить"]);
