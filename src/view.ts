@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, MarkdownRenderer, Component, Notice } from "obsidian";
+import { App, ItemView, Modal, WorkspaceLeaf, MarkdownRenderer, Component, Notice } from "obsidian";
 import { AddDomainModal, ConfirmModal } from "./modals";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
@@ -233,6 +233,10 @@ export class LlmWikiView extends ItemView {
         }
         this.currentToolStep = null;
       }
+    } else if (ev.kind === "ask_user") {
+      const el = this.stepsEl.createDiv("llm-wiki-step llm-wiki-step--ask");
+      el.createSpan({ text: "⏳ Ожидание ответа…" });
+      return;
     } else if (ev.kind === "assistant_text") {
       if (!this.assistantBlock) {
         this.assistantBlock = this.stepsEl.createDiv("llm-wiki-step assistant");
@@ -328,6 +332,73 @@ export class LlmWikiView extends ItemView {
     if (items.length === 0) {
       this.historyEl.createDiv("muted").setText("Истории пока нет.");
     }
+  }
+
+  showQuestionModal(question: string, options: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const modal = new WikiQuestionModal(this.app, question, options, resolve, reject);
+      modal.open();
+    });
+  }
+}
+
+class WikiQuestionModal extends Modal {
+  constructor(
+    app: App,
+    private question: string,
+    private options: string[],
+    private resolve: (answer: string) => void,
+    private reject: () => void,
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl("h3", { text: "LLM Wiki — требуется ответ" });
+    contentEl.createEl("p", { text: this.question });
+
+    if (this.options.length > 0) {
+      const btnRow = contentEl.createDiv("llm-wiki-modal-options");
+      for (const opt of this.options) {
+        const btn = btnRow.createEl("button", { text: opt });
+        btn.addEventListener("click", () => {
+          this.resolve(opt);
+          this.close();
+        });
+      }
+    } else {
+      const input = contentEl.createEl("input", {
+        type: "text",
+        cls: "llm-wiki-modal-input",
+      });
+      input.focus();
+      const submit = () => {
+        const val = input.value.trim();
+        if (!val) return;
+        this.resolve(val);
+        this.close();
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") submit();
+      });
+      contentEl.createEl("button", { text: "ОК" }).addEventListener("click", submit);
+    }
+
+    const cancelBtn = contentEl.createEl("button", {
+      text: "Отменить",
+      cls: "mod-warning",
+    });
+    cancelBtn.addEventListener("click", () => {
+      this.reject();
+      this.close();
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
   }
 }
 

@@ -131,7 +131,10 @@ export class WikiController {
           view.appendEvent(ev);
           try {
             const answer = await view.showQuestionModal(ev.question, ev.options);
-            runner.sendToolResult(ev.toolUseId, answer);
+            if (!runner.sendToolResult(ev.toolUseId, answer)) {
+              // process already exited before answer was delivered — abort will drain the loop
+              ctrl.abort();
+            }
           } catch {
             ctrl.abort();
           }
