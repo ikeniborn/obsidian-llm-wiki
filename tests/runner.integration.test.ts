@@ -71,4 +71,41 @@ describe("IclaudeRunner (integration)", () => {
     const exit = events[events.length - 1] as Extract<RunEvent, { kind: "exit" }>;
     expect(exit.code).not.toBe(0);
   });
+
+  it("pauses on ask_user and resumes after sendToolResult", async () => {
+    const PRE = resolve(FIXTURE_DIR, "stream-ask-user-pre.jsonl");
+    const POST = resolve(FIXTURE_DIR, "stream-ask-user-post.jsonl");
+    const MOCK_I = resolve(FIXTURE_DIR, "mock-iclaude-interactive.sh");
+
+    const runner = new IclaudeRunner({
+      iclaudePath: MOCK_I,
+      allowedTools: [],
+      extraArgsForFixture: [PRE, POST],
+    });
+
+    const events: RunEvent[] = [];
+    for await (const ev of runner.run({
+      operation: "ingest",
+      args: ["x"],
+      cwd: process.cwd(),
+      signal: new AbortController().signal,
+      timeoutMs: 10_000,
+    })) {
+      events.push(ev);
+      if (ev.kind === "ask_user") {
+        runner.sendToolResult(ev.toolUseId, "подтвердить");
+      }
+    }
+
+    expect(events.some(e => e.kind === "ask_user")).toBe(true);
+    const askEv = events.find(e => e.kind === "ask_user") as Extract<RunEvent, { kind: "ask_user" }>;
+    expect(askEv.question).toBe("Подтвердить конфигурацию?");
+    expect(askEv.options).toEqual(["подтвердить", "отменить"]);
+    expect(askEv.toolUseId).toBe("aq1");
+    expect(events.some(e => e.kind === "result")).toBe(true);
+    const result = events.find(e => e.kind === "result") as Extract<RunEvent, { kind: "result" }>;
+    expect(result.text).toBe("Домен настроен");
+    const exit = events[events.length - 1] as Extract<RunEvent, { kind: "exit" }>;
+    expect(exit.code).toBe(0);
+  });
 });

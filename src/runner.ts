@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { parseStreamLine } from "./stream";
 import type { RunEvent, RunRequest } from "./types";
@@ -17,7 +17,21 @@ const STDERR_BUFFER_BYTES = 64 * 1024;
 const SIGTERM_GRACE_MS = 3000;
 
 export class IclaudeRunner {
+  private stdin: import("node:stream").Writable | null = null;
+
   constructor(private cfg: RunnerConfig) {}
+
+  sendToolResult(toolUseId: string, answer: string): void {
+    if (!this.stdin || this.stdin.destroyed) return;
+    const payload = JSON.stringify({
+      type: "user",
+      message: {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: toolUseId, content: answer }],
+      },
+    });
+    this.stdin.write(payload + "\n");
+  }
 
   async *run(req: RunRequest): AsyncGenerator<RunEvent, void, void> {
     const prompt = buildPrompt({ operation: req.operation, args: req.args });
@@ -34,15 +48,17 @@ export class IclaudeRunner {
     if (this.cfg.model) claudeArgs.push("--model", this.cfg.model);
     const args = this.cfg.extraArgsForFixture ? [...this.cfg.extraArgsForFixture] : claudeArgs;
 
-    const child: ChildProcessWithoutNullStreams = spawn(this.cfg.iclaudePath, args, {
+    const child: ChildProcess = spawn(this.cfg.iclaudePath, args, {
       cwd: req.cwd,
       env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
+
+    this.stdin = child.stdin;
 
     const stderrBuf: Buffer[] = [];
     let stderrBytes = 0;
-    child.stderr.on("data", (chunk: Buffer) => {
+    child.stderr!.on("data", (chunk: Buffer) => {
       stderrBytes += chunk.length;
       stderrBuf.push(chunk);
       while (stderrBytes > STDERR_BUFFER_BYTES && stderrBuf.length > 1) {
@@ -74,7 +90,7 @@ export class IclaudeRunner {
       }
     };
 
-    const rl = createInterface({ input: child.stdout });
+    const rl = createInterface({ input: child.stdout! });
     rl.on("line", (line) => {
       const ev = parseStreamLine(line);
       if (ev) queue.push(ev);
@@ -87,6 +103,7 @@ export class IclaudeRunner {
       queue.push({ kind: "error", message: `spawn error: ${err.message}` });
       exited = true;
       exitCode = -1;
+      this.stdin = null;
       wake();
     });
     child.on("close", (code) => {
@@ -96,6 +113,7 @@ export class IclaudeRunner {
       }
       exited = true;
       exitCode = code ?? -1;
+      this.stdin = null;
       wake();
     });
 
@@ -113,6 +131,7 @@ export class IclaudeRunner {
       clearTimeout(timeoutHandle);
       req.signal.removeEventListener("abort", onAbort);
       rl.close();
+      this.stdin = null;
     }
   }
 }
