@@ -12,18 +12,22 @@ const ctx = await esbuild.context({
   logLevel: "info",
   sourcemap: production ? false : "inline",
   treeShaking: true,
-  outfile: "main.js",
+  outfile: "dist/main.js",
   platform: "node",
 });
+
+mkdirSync("dist", { recursive: true });
 
 if (production) {
   await ctx.rebuild();
   await ctx.dispose();
-  mkdirSync("dist", { recursive: true });
-  for (const f of ["main.js", "manifest.json", "styles.css"]) {
+  for (const f of ["manifest.json", "styles.css"]) {
     copyFileSync(f, `dist/${f}`);
   }
   console.log("dist/ updated: main.js, manifest.json, styles.css");
 } else {
+  for (const f of ["manifest.json", "styles.css"]) {
+    copyFileSync(f, `dist/${f}`);
+  }
   await ctx.watch();
 }
