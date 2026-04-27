@@ -343,6 +343,8 @@ export class LlmWikiView extends ItemView {
 }
 
 class WikiQuestionModal extends Modal {
+  private settled = false;
+
   constructor(
     app: App,
     private question: string,
@@ -365,19 +367,23 @@ class WikiQuestionModal extends Modal {
       for (const opt of this.options) {
         const btn = btnRow.createEl("button", { text: opt });
         btn.addEventListener("click", () => {
+          if (this.settled) return;
+          this.settled = true;
           this.resolve(opt);
           this.close();
         });
       }
     } else {
       const input = contentEl.createEl("input", {
-        type: "text",
+        attr: { type: "text" },
         cls: "llm-wiki-modal-input",
       });
       input.focus();
       const submit = () => {
+        if (this.settled) return;
         const val = input.value.trim();
         if (!val) return;
+        this.settled = true;
         this.resolve(val);
         this.close();
       };
@@ -392,6 +398,8 @@ class WikiQuestionModal extends Modal {
       cls: "mod-warning",
     });
     cancelBtn.addEventListener("click", () => {
+      if (this.settled) return;
+      this.settled = true;
       this.reject();
       this.close();
     });
@@ -399,6 +407,10 @@ class WikiQuestionModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+    if (!this.settled) {
+      this.settled = true;
+      this.reject();
+    }
   }
 }
 
