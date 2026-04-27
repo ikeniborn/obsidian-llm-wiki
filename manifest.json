@@ -2,8 +2,9 @@
   "id": "obsidian-llm-wiki",
   "name": "LLM Wiki",
   "version": "0.1.0",
-  "minAppVersion": "1.5.0",
-  "description": "Управление компаундируемой wiki через скилл llm-wiki (iclaude/claude).",
+  "minAppVersion": "1.0.0",
+  "description": "Run llm-wiki skill via iclaude, display progress in a side panel",
   "author": "ikeniborn",
+  "authorUrl": "",
   "isDesktopOnly": true
 }
