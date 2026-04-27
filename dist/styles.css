@@ -54,3 +54,10 @@
 .llm-wiki-final { border-top: 1px dashed var(--background-modifier-border); padding-top: 8px; margin-top: 8px; }
 .llm-wiki-history-row { padding: 3px 0; cursor: pointer; }
 .llm-wiki-history-row:hover { background: var(--background-modifier-hover); }
+
+/* ask_user step indicator */
+.llm-wiki-step--ask { color: var(--text-muted); font-style: italic; }
+
+/* WikiQuestionModal */
+.llm-wiki-modal-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.llm-wiki-modal-input { width: 100%; margin-top: 8px; box-sizing: border-box; }

@@ -533,6 +533,10 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
         }
         this.currentToolStep = null;
       }
+    } else if (ev.kind === "ask_user") {
+      const el = this.stepsEl.createDiv("llm-wiki-step llm-wiki-step--ask");
+      el.createSpan({ text: "\u23F3 \u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043E\u0442\u0432\u0435\u0442\u0430\u2026" });
+      return;
     } else if (ev.kind === "assistant_text") {
       if (!this.assistantBlock) {
         this.assistantBlock = this.stepsEl.createDiv("llm-wiki-step assistant");
@@ -625,6 +629,80 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
       this.historyEl.createDiv("muted").setText("\u0418\u0441\u0442\u043E\u0440\u0438\u0438 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442.");
     }
   }
+  showQuestionModal(question, options) {
+    return new Promise((resolve2, reject) => {
+      const modal = new WikiQuestionModal(this.app, question, options, resolve2, reject);
+      modal.open();
+    });
+  }
+};
+var WikiQuestionModal = class extends import_obsidian3.Modal {
+  constructor(app, question, options, resolve2, reject) {
+    super(app);
+    this.question = question;
+    this.options = options;
+    this.resolve = resolve2;
+    this.reject = reject;
+  }
+  settled = false;
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h3", { text: "LLM Wiki \u2014 \u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043E\u0442\u0432\u0435\u0442" });
+    contentEl.createEl("p", { text: this.question });
+    if (this.options.length > 0) {
+      const btnRow = contentEl.createDiv("llm-wiki-modal-options");
+      for (const opt of this.options) {
+        const btn = btnRow.createEl("button", { text: opt });
+        btn.addEventListener("click", () => {
+          if (this.settled)
+            return;
+          this.settled = true;
+          this.resolve(opt);
+          this.close();
+        });
+      }
+    } else {
+      const input = contentEl.createEl("input", {
+        attr: { type: "text" },
+        cls: "llm-wiki-modal-input"
+      });
+      input.focus();
+      const submit = () => {
+        if (this.settled)
+          return;
+        const val = input.value.trim();
+        if (!val)
+          return;
+        this.settled = true;
+        this.resolve(val);
+        this.close();
+      };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter")
+          submit();
+      });
+      contentEl.createEl("button", { text: "\u041E\u041A" }).addEventListener("click", submit);
+    }
+    const cancelBtn = contentEl.createEl("button", {
+      text: "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C",
+      cls: "mod-warning"
+    });
+    cancelBtn.addEventListener("click", () => {
+      if (this.settled)
+        return;
+      this.settled = true;
+      this.reject();
+      this.close();
+    });
+  }
+  onClose() {
+    this.contentEl.empty();
+    if (!this.settled) {
+      this.settled = true;
+      this.reject();
+    }
+  }
 };
 function summariseInput(input) {
   if (!input || typeof input !== "object")
@@ -712,6 +790,14 @@ function mapAssistant(obj) {
     return null;
   const block = content[0];
   if (block?.type === "tool_use") {
+    if (block.name === "AskUserQuestion") {
+      return {
+        kind: "ask_user",
+        question: String(block.input?.prompt ?? ""),
+        options: Array.isArray(block.input?.options) ? block.input.options.map(String) : [],
+        toolUseId: String(block.id ?? "")
+      };
+    }
     return { kind: "tool_use", name: String(block.name ?? "?"), input: block.input };
   }
   if (block?.type === "text") {
@@ -783,7 +869,24 @@ var IclaudeRunner = class {
   constructor(cfg) {
     this.cfg = cfg;
   }
+  stdin = null;
+  sendToolResult(toolUseId, answer) {
+    if (!this.stdin || this.stdin.destroyed)
+      return false;
+    const payload = JSON.stringify({
+      type: "user",
+      message: {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: toolUseId, content: answer }]
+      }
+    });
+    this.stdin.write(payload + "\n");
+    return true;
+  }
   async *run(req) {
+    if (this.stdin !== null) {
+      throw new Error("IclaudeRunner: concurrent run() calls are not supported");
+    }
     const prompt = buildPrompt({ operation: req.operation, args: req.args });
     const claudeArgs = [
       "--",
@@ -801,8 +904,12 @@ var IclaudeRunner = class {
     const child = (0, import_node_child_process.spawn)(this.cfg.iclaudePath, args, {
       cwd: req.cwd,
       env: process.env,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"]
     });
+    if (!child.stdout || !child.stderr || !child.stdin) {
+      throw new Error("spawn did not open expected stdio pipes");
+    }
+    this.stdin = child.stdin;
     const stderrBuf = [];
     let stderrBytes = 0;
     child.stderr.on("data", (chunk) => {
@@ -827,8 +934,13 @@ var IclaudeRunner = class {
     else
       req.signal.addEventListener("abort", onAbort, { once: true });
     const timeoutHandle = setTimeout(() => {
-      if (child.exitCode === null)
+      if (child.exitCode === null) {
         child.kill("SIGTERM");
+        setTimeout(() => {
+          if (child.exitCode === null)
+            child.kill("SIGKILL");
+        }, SIGTERM_GRACE_MS);
+      }
     }, req.timeoutMs);
     const queue = [];
     let resolveNext = null;
@@ -851,6 +963,7 @@ var IclaudeRunner = class {
       queue.push({ kind: "error", message: `spawn error: ${err.message}` });
       exited = true;
       exitCode = -1;
+      this.stdin = null;
       wake();
     });
     child.on("close", (code) => {
@@ -860,6 +973,7 @@ var IclaudeRunner = class {
       }
       exited = true;
       exitCode = code ?? -1;
+      this.stdin = null;
       wake();
     });
     try {
@@ -877,6 +991,7 @@ var IclaudeRunner = class {
       clearTimeout(timeoutHandle);
       req.signal.removeEventListener("abort", onAbort);
       rl.close();
+      this.stdin = null;
     }
   }
 };
@@ -1084,6 +1199,18 @@ var WikiController = class {
     });
     try {
       for await (const ev of runner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs })) {
+        if (ev.kind === "ask_user") {
+          view.appendEvent(ev);
+          try {
+            const answer = await view.showQuestionModal(ev.question, ev.options);
+            if (!runner.sendToolResult(ev.toolUseId, answer)) {
+              ctrl.abort();
+            }
+          } catch {
+            ctrl.abort();
+          }
+          continue;
+        }
         view.appendEvent(ev);
         this.collectStep(ev, steps);
         if (ev.kind === "result")
