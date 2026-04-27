@@ -42,6 +42,16 @@ function mapAssistant(obj: any): RunEvent | null {
   // одна строка stream-json несёт один блок (один tool_use или один text-чанк)
   const block = content[0];
   if (block?.type === "tool_use") {
+    if (block.name === "AskUserQuestion") {
+      return {
+        kind: "ask_user",
+        question: String(block.input?.prompt ?? ""),
+        options: Array.isArray(block.input?.options)
+          ? (block.input.options as unknown[]).map(String)
+          : [],
+        toolUseId: String(block.id ?? ""),
+      };
+    }
     return { kind: "tool_use", name: String(block.name ?? "?"), input: block.input };
   }
   if (block?.type === "text") {

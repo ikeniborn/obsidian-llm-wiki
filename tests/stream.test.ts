@@ -69,4 +69,51 @@ describe("parseStreamLine", () => {
   it("returns null for unknown type without throwing", () => {
     expect(parseStreamLine(JSON.stringify({ type: "unknown" }))).toBeNull();
   });
+
+  it("maps AskUserQuestion tool_use to ask_user event", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [{
+          type: "tool_use",
+          id: "aq1",
+          name: "AskUserQuestion",
+          input: {
+            prompt: "Подтвердить entity_types?",
+            options: ["подтвердить", "исключить типы", "отменить"],
+          },
+        }],
+      },
+    });
+    const ev = parseStreamLine(line);
+    expect(ev).toEqual({
+      kind: "ask_user",
+      question: "Подтвердить entity_types?",
+      options: ["подтвердить", "исключить типы", "отменить"],
+      toolUseId: "aq1",
+    });
+  });
+
+  it("maps AskUserQuestion with no options to ask_user with empty options array", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [{
+          type: "tool_use",
+          id: "aq2",
+          name: "AskUserQuestion",
+          input: { prompt: "Введите id типов:", options: [] },
+        }],
+      },
+    });
+    const ev = parseStreamLine(line);
+    expect(ev).toEqual({
+      kind: "ask_user",
+      question: "Введите id типов:",
+      options: [],
+      toolUseId: "aq2",
+    });
+  });
 });

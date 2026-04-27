@@ -22,7 +22,8 @@ export type RunEvent =
   | { kind: "assistant_text"; delta: string }
   | { kind: "result"; durationMs: number; usdCost?: number; text: string }
   | { kind: "error"; message: string }
-  | { kind: "exit"; code: number };
+  | { kind: "exit"; code: number }
+  | { kind: "ask_user"; question: string; options: string[]; toolUseId: string };
 
 export interface RunHistoryEntry {
   id: string;
