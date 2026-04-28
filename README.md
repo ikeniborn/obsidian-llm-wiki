@@ -1,106 +1,159 @@
-# Obsidian LLM Wiki Plugin
+# LLM Wiki — плагин Obsidian
 
-Плагин запускает скилл `llm-wiki` через `iclaude`/`claude` и показывает прогресс в side-panel Obsidian.
+Автоматически строит и пополняет wiki-базу знаний из ваших заметок с помощью LLM.
 
-## Требования
+> Поддерживаемые бэкенды: **Ollama / OpenAI-compatible** (без облака) · **Claude Code** (Anthropic)
 
-- Obsidian 1.5+
-- Установленный `iclaude.sh` (https://github.com/.../iclaude)
-- Скилл `llm-wiki` в `<repo>/.claude/skills/llm-wiki/`
+## Что умеет
 
-## Сборка
+- **Ingest** — разбирает заметку, извлекает сущности (люди, технологии, процессы, термины), создаёт и обновляет wiki-страницы
+- **Query** — отвечает на вопрос по базе знаний; опционально сохраняет ответ как новую страницу с `[[WikiLinks]]`
+- **Lint** — проверяет качество wiki-домена, находит неполные и устаревшие страницы
+- **Init** — инициализирует новый домен с нуля (структура папок, `_schema.md`, `_index.md`)
+
+Прогресс каждой операции виден в реальном времени в боковой панели Obsidian.
+
+---
+
+## Быстрый старт: Native Agent (Ollama)
+
+Не требует внешних аккаунтов — LLM работает локально.
+
+### 1. Установите Ollama
+
+Скачайте с [ollama.com](https://ollama.com) и запустите:
 
 ```bash
-cd plugins/obsidian-llm-wiki
-npm install
-npm run build
+ollama pull llama3.2
 ```
 
-Будет создан `main.js`.
+### 2. Установите плагин
 
-## Установка в волт
-
-В каждом волте, где нужен плагин:
+Скопируйте папку плагина в vault:
 
 ```bash
-ln -s "$PWD/plugins/obsidian-llm-wiki" \
-      "vaults/Work/.obsidian/plugins/obsidian-llm-wiki"
+# вариант — симлинк для разработки
+ln -s /path/to/obsidian-llm-wiki ~/.config/obsidian/Plugins/obsidian-llm-wiki
 ```
 
-В Obsidian: Settings → Community plugins → Installed plugins → включить "LLM Wiki".
+Или скопируйте папку вручную в `<vault>/.obsidian/plugins/obsidian-llm-wiki/`.
 
-## Настройка
+### 3. Включите плагин
 
-В разделе настроек плагина:
+Obsidian → Settings → Community plugins → найти «LLM Wiki» → включить.
 
-- **Путь к iclaude.sh** — обязательно, абсолютный путь
-- **Рабочая директория (cwd)** — корень репозитория с `.claude/skills/llm-wiki/`. Пусто = автоопределение.
-- **Allowed tools** — `Read,Edit,Write,Glob,Grep` по умолчанию
-- **Таймауты** — `ingest/query/lint/init` в секундах через `/`
+### 4. Настройте
+
+Settings → LLM Wiki:
+
+| Параметр | Значение |
+|---|---|
+| Backend | Native Agent (OpenAI-compatible) |
+| Base URL | `http://localhost:11434/v1` |
+| API Key | `ollama` |
+| Модель | `llama3.2` |
+| Temperature | `0.2` |
+| Max tokens | `4096` |
+
+### 5. Создайте домен
+
+Домен — это пара «папка с источниками → папка wiki». Команда:
+
+`Command Palette` → `LLM Wiki: Init домена` → введите имя домена (например, `work`) → снимите флаг Dry Run → запустите.
+
+Плагин создаст структуру папок и служебные файлы (`_schema.md`, `_index.md`).
+
+### 6. Первый Ingest
+
+1. Откройте любую заметку в Obsidian
+2. `Command Palette` → `LLM Wiki: Ingest активного файла`
+3. Следите за прогрессом в боковой панели
+4. После завершения — новые wiki-страницы появятся в папке домена
+
+---
+
+## Быстрый старт: Claude Code
+
+Для пользователей с установленным [Claude Code CLI](https://claude.ai/code).
+
+### 1. Требования
+
+- Установленный `iclaude.sh` / `iclaude` / `claude` (Claude Code CLI)
+- Скилл `llm-wiki` в директории `<repo>/.claude-isolated/skills/llm-wiki/`
+
+### 2. Установите плагин
+
+Аналогично шагам 2–3 секции Native Agent выше.
+
+### 3. Настройте
+
+Settings → LLM Wiki:
+
+| Параметр | Значение |
+|---|---|
+| Backend | Claude Code |
+| Путь к Claude Code | `/home/user/Documents/Project/iclaude/iclaude.sh` |
+| Путь к навыку llm-wiki | `/home/user/Documents/Project/iclaude/.claude-isolated/skills/llm-wiki` |
+| Модель | `sonnet` |
+| Таймауты | `300/300/600/3600` |
+
+### 4. Первый Ingest
+
+Аналогично шагу 6 секции Native Agent выше.
+
+---
 
 ## Команды
 
-| Команда | Действие |
-|---|---|
-| `LLM Wiki: Открыть панель` | Открыть side-panel |
-| `LLM Wiki: Ingest активного файла` | Добавить текущую заметку в wiki |
-| `LLM Wiki: Query` | Задать вопрос (ответ в панели) |
-| `LLM Wiki: Query + сохранить` | Сохранить ответ как новую страницу и открыть |
-| `LLM Wiki: Lint домена` | Запустить проверки |
-| `LLM Wiki: Init домена` | Первичная инициализация (долго!) |
-| `LLM Wiki: Отменить операцию` | SIGTERM child process |
+Все команды доступны через `Command Palette` (Ctrl+P / Cmd+P).
 
-## Разработка
+| Команда | Действие | Результат |
+|---|---|---|
+| `LLM Wiki: Открыть панель` | Показать боковую панель | Живой лог операций, история |
+| `LLM Wiki: Ingest активного файла` | Извлечь сущности из текущей заметки | Новые/обновлённые wiki-страницы |
+| `LLM Wiki: Query` | Задать вопрос по базе знаний | Ответ в панели с `[[WikiLinks]]` |
+| `LLM Wiki: Query + сохранить` | Вопрос + сохранить ответ | Новая wiki-страница, открывается автоматически |
+| `LLM Wiki: Lint домена` | Проверить качество wiki | Отчёт о проблемах в панели |
+| `LLM Wiki: Init домена` | Инициализировать новый домен | Структура wiki-папок и служебные файлы |
+| `LLM Wiki: Отменить операцию` | Остановить текущую операцию | SIGTERM → SIGKILL через 3с |
 
-```bash
-npm run dev    # esbuild watch
-npm test       # vitest
-```
+---
 
-## Smoke-test чек-лист (после каждой сборки)
+## Справочник настроек
 
-1. **Сборка и установка**
-   - `npm run build` без ошибок
-   - Symlink в `vaults/Work/.obsidian/plugins/`
-   - Плагин включён в настройках Obsidian
+### Общие (оба бэкенда)
 
-2. **Settings**
-   - Заполнен `iclaudePath`
-   - cwd пуст → autodetect находит репо
-   - Settings сохраняются после перезагрузки Obsidian
+| Параметр | Описание | По умолчанию |
+|---|---|---|
+| Backend | `claude-code` или `native-agent` | `claude-code` |
+| Лимит истории | Максимум записей в истории панели | `20` |
+| Лог агента (JSONL) | Абсолютный путь к файлу лога; пусто — отключено | — |
 
-3. **Open panel**
-   - Команда `LLM Wiki: Открыть панель` показывает side-panel
-   - Список «История» пуст или содержит прошлые запуски
+### Native Agent
 
-4. **Ingest активного файла**
-   - Открыть `vaults/Work/!Daily/<любая>.md`
-   - Запустить `LLM Wiki: Ingest активного файла`
-   - В панели появляются шаги (`Read`, `Edit`/`Write`)
-   - Финальный отчёт виден
-   - В git status появились новые/изменённые файлы в `vaults/Work/!Wiki/`
+| Параметр | Описание | По умолчанию |
+|---|---|---|
+| Base URL | OpenAI-compatible endpoint | `http://localhost:11434/v1` |
+| API Key | `ollama` для Ollama; `sk-...` для OpenAI | `ollama` |
+| Модель | Имя модели: `llama3.2`, `mistral`, `gpt-4o`... | `llama3.2` |
+| Temperature | `0.0`–`1.0`. Низкая (`0.1`–`0.3`) = точные факты | `0.2` |
+| Max tokens | Макс. токенов в ответе; ≥ 4096 для wiki-страниц | `4096` |
+| Top-p | Nucleus sampling `0.0`–`1.0`; пусто = отключено | — |
+| Request timeout (сек) | Таймаут HTTP; для больших моделей Ollama ≥ 300 | `300` |
+| num_ctx | Размер контекста (только Ollama); пусто = дефолт модели | — |
+| System prompt | Системный промпт; перезаписывает встроенный при изменении | встроенный |
 
-5. **Query inline**
-   - Команда `LLM Wiki: Query`, вопрос «Что такое SCD2?»
-   - Ответ появляется в панели, WikiLinks кликабельны
+### Claude Code
 
-6. **Query + save**
-   - Тот же вопрос с командой `Query + сохранить`
-   - После завершения — Obsidian открыл созданную страницу
+| Параметр | Описание | По умолчанию |
+|---|---|---|
+| Путь к Claude Code | Полный путь к `iclaude.sh` / `iclaude` / `claude` | — |
+| Путь к навыку llm-wiki | Полный путь к папке навыка (содержит `shared/domain-map-*.json`) | — |
+| Allowed tools | Список через запятую | `Read,Edit,Write,Glob,Grep` |
+| Модель | Пресет (`opus`/`sonnet`/`haiku`) или произвольный ID (`claude-opus-4-7`) | дефолт claude |
+| Таймауты | `ingest/query/lint/init` в секундах через `/` | `300/300/600/3600` |
+| Показывать raw JSON | Отображать сырые JSON-события в панели | выкл |
 
-7. **Cancel**
-   - Запустить ingest, нажать «Отменить» в первые 2с
-   - В истории статус `cancelled`, child process завершён (`pgrep claude` пусто)
+---
 
-8. **Lint**
-   - `LLM Wiki: Lint домена` → выбрать «вся вики»
-   - Отчёт виден в панели
-
-9. **Ошибки**
-   - Очистить `iclaudePath` → команда показывает Notice
-   - Указать неверный cwd → Notice о .claude/skills/llm-wiki
-
-10. **Race / single-flight**
-    - Запустить ingest, не дожидаясь завершения вызвать query → Notice «Уже выполняется»
-
-Записать результаты прогонов с датами; повторять после каждого изменения.
+> Инструкции для разработчиков, сборка и smoke-test чеклист — в [docs/dev.md](docs/dev.md).
