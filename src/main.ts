@@ -27,7 +27,7 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.addCommand({
       id: "open-panel",
-      name: "Открыть панель",
+      name: "Open panel",
       callback: () => {
         const right = this.app.workspace.getRightLeaf(false);
         if (right) void right.setViewState({ type: LLM_WIKI_VIEW_TYPE, active: true });
@@ -36,25 +36,25 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.addCommand({
       id: "ingest-current",
-      name: "Ingest активного файла",
+      name: "Ingest active file",
       callback: () => void this.controller.ingestActive(),
     });
 
     this.addCommand({
       id: "query",
-      name: "Query (вопрос)",
+      name: "Query",
       callback: () => new QueryModal(this.app, false, (q) => void this.controller.query(q, false)).open(),
     });
 
     this.addCommand({
       id: "query-save",
-      name: "Query + сохранить как страницу",
+      name: "Query and save as page",
       callback: () => new QueryModal(this.app, true, (q) => void this.controller.query(q, true)).open(),
     });
 
     this.addCommand({
       id: "lint",
-      name: "Lint домена",
+      name: "Lint domain",
       callback: () => {
         const domains = this.controller.loadDomains();
         new DomainModal(this.app, "Lint", true, null, domains,
@@ -64,7 +64,7 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.addCommand({
       id: "init",
-      name: "Init домена",
+      name: "Init domain",
       callback: () => {
         const domains = this.controller.loadDomains();
         new DomainModal(this.app, "Init", false, { dryRun: true }, domains,
@@ -74,7 +74,7 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.addCommand({
       id: "cancel",
-      name: "Отменить операцию",
+      name: "Cancel operation",
       callback: () => this.controller.cancelCurrent(),
     });
 

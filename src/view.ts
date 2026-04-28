@@ -58,11 +58,11 @@ export class LlmWikiView extends ItemView {
     // Domain selector + per-domain actions
     const domainBox = root.createDiv("llm-wiki-domain");
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
-    domainRow.createSpan({ cls: "muted", text: "Домен:" });
+    domainRow.createSpan({ cls: "muted", text: "Domain:" });
     this.domainSelect = domainRow.createEl("select", { cls: "llm-wiki-domain-select" });
-    const refreshBtn = domainRow.createEl("button", { text: "↻", attr: { title: "Перечитать domain-map.json" } });
+    const refreshBtn = domainRow.createEl("button", { text: "↻", attr: { title: "Reload domain-map.json" } });
     refreshBtn.addEventListener("click", () => this.refreshDomains());
-    const addBtn = domainRow.createEl("button", { text: "+ Домен" });
+    const addBtn = domainRow.createEl("button", { text: "Add domain" });
     addBtn.addEventListener("click", () => this.openAddDomain());
 
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
@@ -72,27 +72,27 @@ export class LlmWikiView extends ItemView {
 
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
-      if (!file) { new Notice("Нет активного файла"); return; }
+      if (!file) { new Notice("No active file"); return; }
       const domainId = this.domainSelect.value || undefined;
-      new ConfirmModal(this.plugin.app, "Ingest — подтверждение", [
-        `Файл: ${file.name}`,
-        "Claude прочитает файл, извлечёт сущности и обновит wiki-страницы домена.",
+      new ConfirmModal(this.plugin.app, "Ingest — confirm", [
+        `File: ${file.name}`,
+        "Claude will read the file, extract entities and update domain wiki pages.",
       ], () => this.plugin.controller.ingestActive(domainId)).open();
     });
     this.lintBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
-      const domainLabel = d ? `«${d}»` : "вся wiki";
-      new ConfirmModal(this.plugin.app, "Lint — подтверждение", [
-        `Домен: ${domainLabel}`,
-        "Claude проверит wiki-страницы на соответствие стандартам качества.",
+      const domainLabel = d ? `«${d}»` : "all wiki";
+      new ConfirmModal(this.plugin.app, "Lint — confirm", [
+        `Domain: ${domainLabel}`,
+        "Claude will check wiki pages for quality standards.",
       ], () => this.plugin.controller.lint(d || "all")).open();
     });
     this.initBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
-      if (!d) { new Notice("Выберите конкретный домен для init"); return; }
-      new ConfirmModal(this.plugin.app, "Init — подтверждение", [
-        `Домен: «${d}»`,
-        "Claude создаст структуру папок и базовые wiki-страницы для домена.",
+      if (!d) { new Notice("Select a specific domain for init"); return; }
+      new ConfirmModal(this.plugin.app, "Init — confirm", [
+        `Domain: «${d}»`,
+        "Claude will create the folder structure and base wiki pages for the domain.",
       ], () => this.plugin.controller.init(d, false)).open();
     });
 
@@ -102,12 +102,12 @@ export class LlmWikiView extends ItemView {
     const ask = root.createDiv("llm-wiki-ask");
     this.queryInput = ask.createEl("textarea", {
       cls: "llm-wiki-query-input",
-      attr: { placeholder: "Вопрос по wiki… (Ctrl+Enter — спросить, Ctrl+Shift+Enter — спросить и сохранить)", rows: "3" },
+      attr: { placeholder: "Question… (Ctrl+Enter — ask, Ctrl+Shift+Enter — ask and save)", rows: "3" },
     });
     const askRow = ask.createDiv("llm-wiki-ask-row");
-    this.askBtn = askRow.createEl("button", { text: "Спросить" });
-    this.askSaveBtn = askRow.createEl("button", { text: "Спросить и сохранить" });
-    this.cancelBtn = askRow.createEl("button", { text: "Отменить", cls: "mod-warning" });
+    this.askBtn = askRow.createEl("button", { text: "Ask" });
+    this.askSaveBtn = askRow.createEl("button", { text: "Ask and save" });
+    this.cancelBtn = askRow.createEl("button", { text: "Cancel", cls: "mod-warning" });
     this.cancelBtn.disabled = true;
 
     this.askBtn.addEventListener("click", () => this.submitQuery(false));
@@ -123,17 +123,17 @@ export class LlmWikiView extends ItemView {
     const progressHeader = root.createDiv("llm-wiki-progress-header");
     const progressH4 = progressHeader.createEl("h4", { cls: "llm-wiki-progress-title" });
     this.progressToggle = progressH4.createSpan({ cls: "llm-wiki-progress-arrow", text: "▶" });
-    progressH4.appendText(" Ход выполнения ");
+    progressH4.appendText(" Progress ");
     this.progressCount = progressH4.createSpan({ cls: "llm-wiki-progress-count muted", text: "" });
     progressHeader.addEventListener("click", () => this.toggleSteps());
 
     this.stepsEl = root.createDiv("llm-wiki-steps");
     this.stepsEl.addClass("llm-wiki-hidden");
 
-    root.createEl("h4", { text: "Результат" });
+    root.createEl("h4", { text: "Result" });
     this.finalEl = root.createDiv("llm-wiki-final");
 
-    root.createEl("h4", { text: "История" });
+    root.createEl("h4", { text: "History" });
     this.historyEl = root.createDiv("llm-wiki-history");
     this.renderHistory();
   }
@@ -146,7 +146,7 @@ export class LlmWikiView extends ItemView {
     const domains = this.plugin.controller.loadDomains();
     const previous = this.domainSelect.value;
     this.domainSelect.empty();
-    const allOpt = this.domainSelect.createEl("option", { value: "", text: "(вся вики)" });
+    const allOpt = this.domainSelect.createEl("option", { value: "", text: "(all)" });
     void allOpt;
     for (const d of domains) {
       this.domainSelect.createEl("option", { value: d.id, text: d.name || d.id });
@@ -158,7 +158,7 @@ export class LlmWikiView extends ItemView {
 
   private openAddDomain(): void {
     const cwd = this.plugin.controller.cwdOrEmpty();
-    if (!cwd) { new Notice("cwd не задан"); return; }
+    if (!cwd) { new Notice("Working directory is not set"); return; }
     // wiki_root возьмём из существующих записей или дефолт vaults/Work/!Wiki
     const domains = this.plugin.controller.loadDomains();
     const wikiRoot = (() => {
@@ -176,8 +176,8 @@ export class LlmWikiView extends ItemView {
 
   private submitQuery(save: boolean): void {
     const q = this.queryInput.value.trim();
-    if (!q) { new Notice("Введите вопрос"); return; }
-    if (this.state === "running") { new Notice("Уже выполняется операция"); return; }
+    if (!q) { new Notice("Enter a question"); return; }
+    if (this.state === "running") { new Notice("Operation already in progress"); return; }
     void this.plugin.controller.query(q, save, this.domainSelect.value || undefined);
     this.queryInput.value = "";
   }
@@ -240,7 +240,7 @@ export class LlmWikiView extends ItemView {
       }
     } else if (ev.kind === "ask_user") {
       const el = this.stepsEl.createDiv("llm-wiki-step llm-wiki-step--ask");
-      el.createSpan({ text: "⏳ Ожидание ответа…" });
+      el.createSpan({ text: "⏳ Waiting for answer…" });
       return;
     } else if (ev.kind === "assistant_text") {
       if (ev.isReasoning) {
@@ -318,7 +318,7 @@ export class LlmWikiView extends ItemView {
       return;
     }
     const dur = ((Date.now() - this.startTs) / 1000).toFixed(1);
-    this.progressCount.setText(`${this.stepCount} шагов · ${dur}s`);
+    this.progressCount.setText(`${this.stepCount} steps · ${dur}s`);
   }
 
   private elapsedShort(): string {
@@ -346,11 +346,11 @@ export class LlmWikiView extends ItemView {
         this.finalEl.empty();
         const comp = new Component();
         comp.load();
-        void MarkdownRenderer.render(this.app, it.finalText || "(пусто)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
+        void MarkdownRenderer.render(this.app, it.finalText || "(empty)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
       });
     }
     if (items.length === 0) {
-      this.historyEl.createDiv("muted").setText("Истории пока нет.");
+      this.historyEl.createDiv("muted").setText("No history yet.");
     }
   }
 
@@ -379,7 +379,7 @@ class WikiQuestionModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h3", { text: "LLM Wiki — требуется ответ" });
+    contentEl.createEl("h3", { text: "LLM Wiki — answer required" });
     contentEl.createEl("p", { text: this.question });
 
     if (this.options.length > 0) {
@@ -410,11 +410,11 @@ class WikiQuestionModal extends Modal {
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") submit();
       });
-      contentEl.createEl("button", { text: "ОК" }).addEventListener("click", submit);
+      contentEl.createEl("button", { text: "OK" }).addEventListener("click", submit);
     }
 
     const cancelBtn = contentEl.createEl("button", {
-      text: "Отменить",
+      text: "Cancel",
       cls: "mod-warning",
     });
     cancelBtn.addEventListener("click", () => {
@@ -464,12 +464,11 @@ function truncate(s: string, n: number): string {
 }
 
 function translateSystemEvent(message: string): string {
-  if (message === "hook_started") return "Запуск";
-  if (message === "hook_response") return "Инициализация";
+  if (message === "hook_started") return "Starting";
+  if (message === "hook_response") return "Initialising";
   if (message.startsWith("init")) {
-    // message имеет вид "init (claude-sonnet-4-6)" из parseStreamLine()
     const model = message.replace(/^init\s*/, "").replace(/[()]/g, "").trim();
-    return model ? `Инициализация (${model})` : "Инициализация";
+    return model ? `Initialising (${model})` : "Initialising";
   }
   return message;
 }

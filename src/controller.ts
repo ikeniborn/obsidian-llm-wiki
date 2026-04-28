@@ -24,13 +24,13 @@ export class WikiController {
   cancelCurrent(): void {
     if (this.current) {
       this.current.abort();
-      new Notice("Отмена…");
+      new Notice("Cancelling…");
     }
   }
 
   async ingestActive(domainId?: string): Promise<void> {
     const file = this.app.workspace.getActiveFile();
-    if (!file) { new Notice("Нет активного файла"); return; }
+    if (!file) { new Notice("No active file"); return; }
     const abs = (this.app.vault.adapter as { getFullPath: (p: string) => string }).getFullPath(file.path);
     const spawnCwd = resolveCwd(this.plugin.settings);
     let filePath: string;
@@ -81,33 +81,33 @@ export class WikiController {
   registerDomain(input: AddDomainInput): { ok: true } | { ok: false; error: string } {
     if (this.plugin.settings.backend === "claude-code") {
       const sp = this.requireSkillPath();
-      if (!sp) return { ok: false, error: "путь к навыку не задан" };
+      if (!sp) return { ok: false, error: "skill path is not set" };
     }
     const vaultBase = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     const repoRoot = this.plugin.settings.backend === "native-agent"
       ? vaultBase
       : (resolveCwd(this.plugin.settings) ?? "");
     const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), repoRoot, input);
-    if (r.ok) new Notice(`Домен «${input.id}» добавлен`);
-    else new Notice(`Не удалось добавить домен: ${r.error}`);
+    if (r.ok) new Notice(`Domain «${input.id}» added`);
+    else new Notice(`Failed to add domain: ${r.error}`);
     return r;
   }
 
   private requireSkillPath(): string | null {
     const sp = resolveSkillPath(this.plugin.settings);
-    if (!sp) { new Notice("Укажите путь к навыку llm-wiki в настройках"); return null; }
-    if (!existsSync(sp)) { new Notice(`Папка навыка не найдена: ${sp}`); return null; }
+    if (!sp) { new Notice("Set the LLM Wiki skill path in settings"); return null; }
+    if (!existsSync(sp)) { new Notice(`Skill folder not found: ${sp}`); return null; }
     return sp;
   }
 
   private requireIclaude(): string | null {
     const p = this.plugin.settings.iclaudePath;
-    if (!p) { new Notice("Укажите путь к Claude Code в настройках"); return null; }
-    if (!existsSync(p)) { new Notice(`Claude Code не найден: ${p}`); return null; }
+    if (!p) { new Notice("Set the Claude Code path in settings"); return null; }
+    if (!existsSync(p)) { new Notice(`Claude Code not found: ${p}`); return null; }
     try {
       statSync(p);
     } catch {
-      new Notice(`Claude Code недоступен: ${p}`);
+      new Notice(`Claude Code unavailable: ${p}`);
       return null;
     }
     return p;
@@ -139,7 +139,7 @@ export class WikiController {
 
   private async dispatch(op: WikiOperation, args: string[], domainId?: string): Promise<void> {
     if (this.isBusy()) {
-      new Notice("Уже выполняется операция, отмените её сначала");
+      new Notice("Operation in progress, cancel it first");
       return;
     }
     if (this.plugin.settings.backend === "claude-code" && !this.requireSkillPath()) return;
@@ -222,7 +222,7 @@ export class WikiController {
       }
     } catch (err) {
       status = "error";
-      finalText = `Ошибка: ${(err as Error).message}`;
+      finalText = `Error: ${(err as Error).message}`;
       this.logEvent(sessionId, op, domainId, { kind: "error", message: finalText });
     } finally {
       this.current = null;

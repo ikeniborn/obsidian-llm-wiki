@@ -52,7 +52,7 @@ function addDomain(dir, vaultName, repoRoot, input) {
   const id = input.id.trim();
   if (!id)
     return { ok: false, error: "ID \u0434\u043E\u043C\u0435\u043D\u0430 \u043F\u0443\u0441\u0442" };
-  if (!/^[\p{L}\p{N}_\-]+$/u.test(id))
+  if (!/^[\p{L}\p{N}_-]+$/u.test(id))
     return { ok: false, error: "ID \u0434\u043E\u043F\u0443\u0441\u043A\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B/\u0446\u0438\u0444\u0440\u044B/_/-" };
   const p = domainMapPath(dir, vaultName);
   let data;
@@ -158,8 +158,8 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = this.plugin.settings;
-    containerEl.createEl("h2", { text: "LLM Wiki" });
-    new import_obsidian.Setting(containerEl).setName("Backend").setDesc("\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0431\u044D\u043A\u0435\u043D\u0434 \u0434\u043B\u044F \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439.").addDropdown(
+    new import_obsidian.Setting(containerEl).setName("LLM Wiki").setHeading();
+    new import_obsidian.Setting(containerEl).setName("Backend").setDesc("Choose the backend for running operations.").addDropdown(
       (d) => d.addOption("claude-code", "Claude Code").addOption("native-agent", "Native Agent (OpenAI-compatible)").setValue(s.backend).onChange(async (v) => {
         s.backend = v;
         await this.plugin.saveSettings();
@@ -167,25 +167,25 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     if (s.backend === "claude-code") {
-      new import_obsidian.Setting(containerEl).setName("\u041F\u0443\u0442\u044C \u043A Claude Code").setDesc("\u041E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E. \u041F\u043E\u043B\u043D\u044B\u0439 \u0430\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A iclaude.sh / iclaude / claude.").addText(
+      new import_obsidian.Setting(containerEl).setName("Claude Code path").setDesc("Required. Absolute path to iclaude.sh / iclaude / claude.").addText(
         (t) => t.setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh").setValue(s.iclaudePath).onChange(async (v) => {
           s.iclaudePath = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("\u041F\u0443\u0442\u044C \u043A \u043D\u0430\u0432\u044B\u043A\u0443 llm-wiki").setDesc("\u041E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E. \u041F\u043E\u043B\u043D\u044B\u0439 \u0430\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A \u043F\u0430\u043F\u043A\u0435 \u043D\u0430\u0432\u044B\u043A\u0430 (\u0441\u043E\u0434\u0435\u0440\u0436\u0438\u0442 shared/domain-map.json).").addText(
+      new import_obsidian.Setting(containerEl).setName("LLM Wiki skill path").setDesc("Required. Absolute path to the skill folder (contains shared/domain-map.json).").addText(
         (t) => t.setPlaceholder("/home/user/Documents/Project/iclaude/.nvm-isolated/.claude-isolated/skills/llm-wiki").setValue(s.cwd).onChange(async (v) => {
           s.cwd = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Allowed tools").setDesc("\u0421\u043F\u0438\u0441\u043E\u043A \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E. \u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E: Read,Edit,Write,Glob,Grep").addText(
+      new import_obsidian.Setting(containerEl).setName("Allowed tools").setDesc("Comma-separated list. Default: Read,Edit,Write,Glob,Grep").addText(
         (t) => t.setValue(s.allowedTools.join(",")).onChange(async (v) => {
           s.allowedTools = v.split(",").map((x) => x.trim()).filter(Boolean);
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("\u041C\u043E\u0434\u0435\u043B\u044C").setDesc("\u041F\u0435\u0440\u0435\u0434\u0430\u0451\u0442\u0441\u044F claude \u043A\u0430\u043A --model. \u041F\u0440\u0435\u0441\u0435\u0442, \u043B\u0438\u0431\u043E \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0440\u043E\u0438\u0437\u0432\u043E\u043B\u044C\u043D\u044B\u0439 ID (claude-opus-4-7 \u0438 \u0442.\u043F.).").addDropdown((d) => {
+      new import_obsidian.Setting(containerEl).setName("Model").setDesc("Passed to claude as --model. Use a preset or enter a custom ID (e.g. claude-opus-4-7).").addDropdown((d) => {
         for (const p of MODEL_PRESETS)
           d.addOption(p.value, p.label);
         if (s.model && !MODEL_PRESETS.some((p) => p.value === s.model)) {
@@ -205,7 +205,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("\u0422\u0430\u0439\u043C\u0430\u0443\u0442\u044B (\u0441\u0435\u043A\u0443\u043D\u0434\u044B)").setDesc("ingest / query / lint / init").addText(
+      new import_obsidian.Setting(containerEl).setName("Timeouts (seconds)").setDesc("ingest / query / lint / init").addText(
         (t) => t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`).onChange(async (v) => {
           const parts = v.split("/").map((x) => Number(x.trim()));
           if (parts.length === 4 && parts.every((n) => Number.isFinite(n) && n > 0)) {
@@ -214,14 +214,14 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("\u041F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C raw JSON \u0432 \u043F\u0430\u043D\u0435\u043B\u0438").addToggle(
+      new import_obsidian.Setting(containerEl).setName("Show raw JSON in panel").addToggle(
         (t) => t.setValue(s.showRawJson).onChange(async (v) => {
           s.showRawJson = v;
           await this.plugin.saveSettings();
         })
       );
       if (import_obsidian.Platform.isMobile) {
-        containerEl.createEl("p", { text: "\u26A0 Mobile \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F (\u043D\u0435\u0442 child_process)." });
+        containerEl.createEl("p", { text: "\u26A0 Mobile is not supported (no child_process)." });
       }
     } else {
       new import_obsidian.Setting(containerEl).setName("Base URL").setDesc("OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1").addText(
@@ -230,19 +230,19 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("API Key").setDesc('\u0414\u043B\u044F Ollama \u0432\u0432\u0435\u0434\u0438\u0442\u0435 "ollama". \u0414\u043B\u044F OpenAI \u2014 \u043A\u043B\u044E\u0447 sk-...').addText(
+      new import_obsidian.Setting(containerEl).setName("API Key").setDesc('For Ollama enter "ollama". For OpenAI \u2014 key sk-...').addText(
         (t) => t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
           s.nativeAgent.apiKey = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("\u041C\u043E\u0434\u0435\u043B\u044C").setDesc("\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438: llama3.2, mistral, gpt-4o \u0438 \u0442.\u043F.").addText(
+      new import_obsidian.Setting(containerEl).setName("Model").setDesc("Model name: llama3.2, mistral, gpt-4o, etc.").addText(
         (t) => t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
           s.nativeAgent.model = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Temperature").setDesc("0.0\u20131.0. \u041D\u0438\u0437\u043A\u0430\u044F (0.1\u20130.3) \u2014 \u0442\u043E\u0447\u043D\u044B\u0435 \u0444\u0430\u043A\u0442\u044B, \u0432\u044B\u0441\u043E\u043A\u0430\u044F \u2014 \u0442\u0432\u043E\u0440\u0447\u0435\u0441\u043A\u0438\u0439 \u0441\u0442\u0438\u043B\u044C.").addText(
+      new import_obsidian.Setting(containerEl).setName("Temperature").setDesc("0.0\u20131.0. Low (0.1\u20130.3) \u2014 factual, high \u2014 creative.").addText(
         (t) => t.setPlaceholder("0.2").setValue(String(s.nativeAgent.temperature)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n >= 0 && n <= 2) {
@@ -251,7 +251,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Max tokens").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u0432 \u0432 \u043E\u0442\u0432\u0435\u0442\u0435. \u0414\u043B\u044F \u0432\u0438\u043A\u0438-\u0441\u0442\u0440\u0430\u043D\u0438\u0446 \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F \u2265 4096.").addText(
+      new import_obsidian.Setting(containerEl).setName("Max tokens").setDesc("Max tokens in response. For wiki pages \u2265 4096 recommended.").addText(
         (t) => t.setPlaceholder("4096").setValue(String(s.nativeAgent.maxTokens)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n > 0) {
@@ -260,7 +260,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Top-p").setDesc("0.0\u20131.0, \u0438\u043B\u0438 \u043F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C. \u0410\u043B\u044C\u0442\u0435\u0440\u043D\u0430\u0442\u0438\u0432\u0430 temperature (nucleus sampling).").addText(
+      new import_obsidian.Setting(containerEl).setName("Top-p").setDesc("0.0\u20131.0, or empty to disable. Alternative to temperature (nucleus sampling).").addText(
         (t) => t.setPlaceholder("(\u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E)").setValue(s.nativeAgent.topP != null ? String(s.nativeAgent.topP) : "").onChange(async (v) => {
           const trimmed = v.trim();
           if (!trimmed) {
@@ -273,7 +273,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Request timeout (\u0441\u0435\u043A)").setDesc("\u0422\u0430\u0439\u043C\u0430\u0443\u0442 HTTP-\u0437\u0430\u043F\u0440\u043E\u0441\u0430 \u043A LLM. \u0414\u043B\u044F Ollama \u043D\u0430 \u0431\u043E\u043B\u044C\u0448\u0438\u0445 \u043C\u043E\u0434\u0435\u043B\u044F\u0445 \u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F 300+.").addText(
+      new import_obsidian.Setting(containerEl).setName("Request timeout (s)").setDesc("HTTP request timeout for the LLM. For Ollama on large models 300+ recommended.").addText(
         (t) => t.setPlaceholder("300").setValue(String(s.nativeAgent.requestTimeoutSec)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n > 0) {
@@ -282,7 +282,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("num_ctx (Ollama)").setDesc("\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0430 \u043C\u043E\u0434\u0435\u043B\u0438. \u0422\u043E\u043B\u044C\u043A\u043E Ollama. \u041F\u0443\u0441\u0442\u043E \u2014 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438.").addText(
+      new import_obsidian.Setting(containerEl).setName("num_ctx (Ollama)").setDesc("Model context size. Ollama only. Empty \u2014 use model default.").addText(
         (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
           const trimmed = v.trim();
           if (!trimmed) {
@@ -295,7 +295,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("System prompt").setDesc("\u0414\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0432 \u043D\u0430\u0447\u0430\u043B\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u043C\u043F\u0442\u0430 \u043A\u0430\u0436\u0434\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438. \u041F\u0435\u0440\u0435\u0437\u0430\u043F\u0438\u0441\u044B\u0432\u0430\u0435\u0442 \u0434\u0435\u0444\u043E\u043B\u0442 \u043F\u0440\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0438.").addTextArea((t) => {
+      new import_obsidian.Setting(containerEl).setName("System prompt").setDesc("Prepended to the system prompt for every operation. Overrides the default when set.").addTextArea((t) => {
         t.inputEl.style.minHeight = "96px";
         t.inputEl.style.width = "100%";
         t.setValue(s.nativeAgent.systemPrompt).onChange(async (v) => {
@@ -304,14 +304,14 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
         });
         return t;
       });
-      new import_obsidian.Setting(containerEl).setName("\u041F\u0430\u043F\u043A\u0430 domain-map").setDesc("\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/.obsidian/plugins/llm-wiki/").addText(
+      new import_obsidian.Setting(containerEl).setName("Domain map folder").setDesc("Where to store domain-map-<vault>.json. Empty \u2014 auto: <vault>/.obsidian/plugins/llm-wiki/").addText(
         (t) => t.setPlaceholder("(\u0430\u0432\u0442\u043E)").setValue(s.nativeAgent.domainMapDir).onChange(async (v) => {
           s.nativeAgent.domainMapDir = v.trim();
           await this.plugin.saveSettings();
         })
       );
     }
-    new import_obsidian.Setting(containerEl).setName("\u041B\u0438\u043C\u0438\u0442 \u0438\u0441\u0442\u043E\u0440\u0438\u0438").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439 \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u0431\u043E\u043A\u043E\u0432\u043E\u0439 \u043F\u0430\u043D\u0435\u043B\u0438.").addText(
+    new import_obsidian.Setting(containerEl).setName("History limit").setDesc("Maximum operations kept in sidebar history.").addText(
       (t) => t.setValue(String(s.historyLimit)).onChange(async (v) => {
         const n = Number(v);
         if (Number.isFinite(n) && n > 0) {
@@ -320,7 +320,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
         }
       })
     );
-    new import_obsidian.Setting(containerEl).setName("\u041B\u043E\u0433 \u0430\u0433\u0435\u043D\u0442\u0430 (JSONL)").setDesc("\u0410\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A \u0444\u0430\u0439\u043B\u0443 \u043B\u043E\u0433\u0430. \u041A\u0430\u0436\u0434\u044B\u0439 RunEvent \u043F\u0438\u0448\u0435\u0442\u0441\u044F \u043A\u0430\u043A \u043E\u0434\u043D\u0430 JSON-\u0441\u0442\u0440\u043E\u043A\u0430. \u041F\u0443\u0441\u0442\u043E \u2014 \u043B\u043E\u0433\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E.").addText(
+    new import_obsidian.Setting(containerEl).setName("Agent log (JSONL)").setDesc("Absolute path to the log file. Each RunEvent written as one JSON line. Empty \u2014 logging disabled.").addText(
       (t) => t.setPlaceholder("/tmp/llm-wiki-agent.jsonl").setValue(s.agentLogPath).onChange(async (v) => {
         s.agentLogPath = v.trim();
         await this.plugin.saveSettings();
@@ -554,7 +554,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
   getIcon() {
     return "brain-circuit";
   }
-  async onOpen() {
+  onOpen() {
     const root = this.containerEl.children[1];
     root.empty();
     root.addClass("llm-wiki-view");
@@ -563,11 +563,11 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
     this.statusEl = header.createDiv("llm-wiki-status");
     const domainBox = root.createDiv("llm-wiki-domain");
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
-    domainRow.createSpan({ cls: "muted", text: "\u0414\u043E\u043C\u0435\u043D:" });
+    domainRow.createSpan({ cls: "muted", text: "Domain:" });
     this.domainSelect = domainRow.createEl("select", { cls: "llm-wiki-domain-select" });
-    const refreshBtn = domainRow.createEl("button", { text: "\u21BB", attr: { title: "\u041F\u0435\u0440\u0435\u0447\u0438\u0442\u0430\u0442\u044C domain-map.json" } });
+    const refreshBtn = domainRow.createEl("button", { text: "\u21BB", attr: { title: "Reload domain-map.json" } });
     refreshBtn.addEventListener("click", () => this.refreshDomains());
-    const addBtn = domainRow.createEl("button", { text: "+ \u0414\u043E\u043C\u0435\u043D" });
+    const addBtn = domainRow.createEl("button", { text: "Add domain" });
     addBtn.addEventListener("click", () => this.openAddDomain());
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
     this.ingestBtn = actionRow.createEl("button", { text: "Ingest" });
@@ -576,44 +576,44 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
       if (!file) {
-        new import_obsidian3.Notice("\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430");
+        new import_obsidian3.Notice("No active file");
         return;
       }
       const domainId = this.domainSelect.value || void 0;
-      new ConfirmModal(this.plugin.app, "Ingest \u2014 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435", [
-        `\u0424\u0430\u0439\u043B: ${file.name}`,
-        "Claude \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0435\u0442 \u0444\u0430\u0439\u043B, \u0438\u0437\u0432\u043B\u0435\u0447\u0451\u0442 \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0438 \u0438 \u043E\u0431\u043D\u043E\u0432\u0438\u0442 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0434\u043E\u043C\u0435\u043D\u0430."
+      new ConfirmModal(this.plugin.app, "Ingest \u2014 confirm", [
+        `File: ${file.name}`,
+        "Claude will read the file, extract entities and update domain wiki pages."
       ], () => this.plugin.controller.ingestActive(domainId)).open();
     });
     this.lintBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
-      const domainLabel = d ? `\xAB${d}\xBB` : "\u0432\u0441\u044F wiki";
-      new ConfirmModal(this.plugin.app, "Lint \u2014 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435", [
-        `\u0414\u043E\u043C\u0435\u043D: ${domainLabel}`,
-        "Claude \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u043D\u0430 \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0438\u0435 \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u0430\u043C \u043A\u0430\u0447\u0435\u0441\u0442\u0432\u0430."
+      const domainLabel = d ? `\xAB${d}\xBB` : "all wiki";
+      new ConfirmModal(this.plugin.app, "Lint \u2014 confirm", [
+        `Domain: ${domainLabel}`,
+        "Claude will check wiki pages for quality standards."
       ], () => this.plugin.controller.lint(d || "all")).open();
     });
     this.initBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
       if (!d) {
-        new import_obsidian3.Notice("\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u044B\u0439 \u0434\u043E\u043C\u0435\u043D \u0434\u043B\u044F init");
+        new import_obsidian3.Notice("Select a specific domain for init");
         return;
       }
-      new ConfirmModal(this.plugin.app, "Init \u2014 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435", [
-        `\u0414\u043E\u043C\u0435\u043D: \xAB${d}\xBB`,
-        "Claude \u0441\u043E\u0437\u0434\u0430\u0441\u0442 \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0443 \u043F\u0430\u043F\u043E\u043A \u0438 \u0431\u0430\u0437\u043E\u0432\u044B\u0435 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0434\u043B\u044F \u0434\u043E\u043C\u0435\u043D\u0430."
+      new ConfirmModal(this.plugin.app, "Init \u2014 confirm", [
+        `Domain: \xAB${d}\xBB`,
+        "Claude will create the folder structure and base wiki pages for the domain."
       ], () => this.plugin.controller.init(d, false)).open();
     });
     this.refreshDomains();
     const ask = root.createDiv("llm-wiki-ask");
     this.queryInput = ask.createEl("textarea", {
       cls: "llm-wiki-query-input",
-      attr: { placeholder: "\u0412\u043E\u043F\u0440\u043E\u0441 \u043F\u043E wiki\u2026 (Ctrl+Enter \u2014 \u0441\u043F\u0440\u043E\u0441\u0438\u0442\u044C, Ctrl+Shift+Enter \u2014 \u0441\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C)", rows: "3" }
+      attr: { placeholder: "Question\u2026 (Ctrl+Enter \u2014 ask, Ctrl+Shift+Enter \u2014 ask and save)", rows: "3" }
     });
     const askRow = ask.createDiv("llm-wiki-ask-row");
-    this.askBtn = askRow.createEl("button", { text: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C" });
-    this.askSaveBtn = askRow.createEl("button", { text: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C" });
-    this.cancelBtn = askRow.createEl("button", { text: "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C", cls: "mod-warning" });
+    this.askBtn = askRow.createEl("button", { text: "Ask" });
+    this.askSaveBtn = askRow.createEl("button", { text: "Ask and save" });
+    this.cancelBtn = askRow.createEl("button", { text: "Cancel", cls: "mod-warning" });
     this.cancelBtn.disabled = true;
     this.askBtn.addEventListener("click", () => this.submitQuery(false));
     this.askSaveBtn.addEventListener("click", () => this.submitQuery(true));
@@ -627,18 +627,18 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
     const progressHeader = root.createDiv("llm-wiki-progress-header");
     const progressH4 = progressHeader.createEl("h4", { cls: "llm-wiki-progress-title" });
     this.progressToggle = progressH4.createSpan({ cls: "llm-wiki-progress-arrow", text: "\u25B6" });
-    progressH4.appendText(" \u0425\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F ");
+    progressH4.appendText(" Progress ");
     this.progressCount = progressH4.createSpan({ cls: "llm-wiki-progress-count muted", text: "" });
     progressHeader.addEventListener("click", () => this.toggleSteps());
     this.stepsEl = root.createDiv("llm-wiki-steps");
-    this.stepsEl.style.display = "none";
-    root.createEl("h4", { text: "\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442" });
+    this.stepsEl.addClass("llm-wiki-hidden");
+    root.createEl("h4", { text: "Result" });
     this.finalEl = root.createDiv("llm-wiki-final");
-    root.createEl("h4", { text: "\u0418\u0441\u0442\u043E\u0440\u0438\u044F" });
+    root.createEl("h4", { text: "History" });
     this.historyEl = root.createDiv("llm-wiki-history");
     this.renderHistory();
   }
-  async onClose() {
+  onClose() {
     if (this.tickHandle !== null)
       window.clearInterval(this.tickHandle);
   }
@@ -646,7 +646,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
     const domains = this.plugin.controller.loadDomains();
     const previous = this.domainSelect.value;
     this.domainSelect.empty();
-    const allOpt = this.domainSelect.createEl("option", { value: "", text: "(\u0432\u0441\u044F \u0432\u0438\u043A\u0438)" });
+    const allOpt = this.domainSelect.createEl("option", { value: "", text: "(all)" });
     for (const d of domains) {
       this.domainSelect.createEl("option", { value: d.id, text: d.name || d.id });
     }
@@ -657,7 +657,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
   openAddDomain() {
     const cwd = this.plugin.controller.cwdOrEmpty();
     if (!cwd) {
-      new import_obsidian3.Notice("cwd \u043D\u0435 \u0437\u0430\u0434\u0430\u043D");
+      new import_obsidian3.Notice("Working directory is not set");
       return;
     }
     const domains = this.plugin.controller.loadDomains();
@@ -676,11 +676,11 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
   submitQuery(save) {
     const q = this.queryInput.value.trim();
     if (!q) {
-      new import_obsidian3.Notice("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0432\u043E\u043F\u0440\u043E\u0441");
+      new import_obsidian3.Notice("Enter a question");
       return;
     }
     if (this.state === "running") {
-      new import_obsidian3.Notice("\u0423\u0436\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F");
+      new import_obsidian3.Notice("Operation already in progress");
       return;
     }
     void this.plugin.controller.query(q, save, this.domainSelect.value || void 0);
@@ -706,7 +706,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
     this.reasoningBlock = null;
     this.reasoningBuffer = "";
     this.stepsOpen = true;
-    this.stepsEl.style.display = "";
+    this.stepsEl.removeClass("llm-wiki-hidden");
     this.progressToggle.setText("\u25BC");
     this.updateMetrics();
     if (this.tickHandle !== null)
@@ -745,7 +745,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
       }
     } else if (ev.kind === "ask_user") {
       const el = this.stepsEl.createDiv("llm-wiki-step llm-wiki-step--ask");
-      el.createSpan({ text: "\u23F3 \u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u043E\u0442\u0432\u0435\u0442\u0430\u2026" });
+      el.createSpan({ text: "\u23F3 Waiting for answer\u2026" });
       return;
     } else if (ev.kind === "assistant_text") {
       if (ev.isReasoning) {
@@ -798,7 +798,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
       this.tickHandle = null;
     }
     this.stepsOpen = false;
-    this.stepsEl.style.display = "none";
+    this.stepsEl.addClass("llm-wiki-hidden");
     this.progressToggle.setText("\u25B6");
     this.updateMetrics();
     this.finalEl.empty();
@@ -811,7 +811,11 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
   }
   toggleSteps() {
     this.stepsOpen = !this.stepsOpen;
-    this.stepsEl.style.display = this.stepsOpen ? "" : "none";
+    if (this.stepsOpen) {
+      this.stepsEl.removeClass("llm-wiki-hidden");
+    } else {
+      this.stepsEl.addClass("llm-wiki-hidden");
+    }
     this.progressToggle.setText(this.stepsOpen ? "\u25BC" : "\u25B6");
   }
   updateMetrics() {
@@ -820,7 +824,7 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
       return;
     }
     const dur = ((Date.now() - this.startTs) / 1e3).toFixed(1);
-    this.progressCount.setText(`${this.stepCount} \u0448\u0430\u0433\u043E\u0432 \xB7 ${dur}s`);
+    this.progressCount.setText(`${this.stepCount} steps \xB7 ${dur}s`);
   }
   elapsedShort() {
     return `${((Date.now() - this.startTs) / 1e3).toFixed(1)}s`;
@@ -844,11 +848,11 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
         this.finalEl.empty();
         const comp = new import_obsidian3.Component();
         comp.load();
-        import_obsidian3.MarkdownRenderer.render(this.app, it.finalText || "(\u043F\u0443\u0441\u0442\u043E)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
+        void import_obsidian3.MarkdownRenderer.render(this.app, it.finalText || "(empty)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
       });
     }
     if (items.length === 0) {
-      this.historyEl.createDiv("muted").setText("\u0418\u0441\u0442\u043E\u0440\u0438\u0438 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442.");
+      this.historyEl.createDiv("muted").setText("No history yet.");
     }
   }
   showQuestionModal(question, options) {
@@ -870,7 +874,7 @@ var WikiQuestionModal = class extends import_obsidian3.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h3", { text: "LLM Wiki \u2014 \u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043E\u0442\u0432\u0435\u0442" });
+    contentEl.createEl("h3", { text: "LLM Wiki \u2014 answer required" });
     contentEl.createEl("p", { text: this.question });
     if (this.options.length > 0) {
       const btnRow = contentEl.createDiv("llm-wiki-modal-options");
@@ -904,10 +908,10 @@ var WikiQuestionModal = class extends import_obsidian3.Modal {
         if (e.key === "Enter")
           submit();
       });
-      contentEl.createEl("button", { text: "\u041E\u041A" }).addEventListener("click", submit);
+      contentEl.createEl("button", { text: "OK" }).addEventListener("click", submit);
     }
     const cancelBtn = contentEl.createEl("button", {
-      text: "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C",
+      text: "Cancel",
       cls: "mod-warning"
     });
     cancelBtn.addEventListener("click", () => {
@@ -956,12 +960,12 @@ function truncate(s, n) {
 }
 function translateSystemEvent(message) {
   if (message === "hook_started")
-    return "\u0417\u0430\u043F\u0443\u0441\u043A";
+    return "Starting";
   if (message === "hook_response")
-    return "\u0418\u043D\u0438\u0446\u0438\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F";
+    return "Initialising";
   if (message.startsWith("init")) {
     const model = message.replace(/^init\s*/, "").replace(/[()]/g, "").trim();
-    return model ? `\u0418\u043D\u0438\u0446\u0438\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F (${model})` : "\u0418\u043D\u0438\u0446\u0438\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F";
+    return model ? `Initialising (${model})` : "Initialising";
   }
   return message;
 }
@@ -977,6 +981,9 @@ var import_node_readline = require("node:readline");
 
 // src/stream.ts
 var PREVIEW_MAX = 200;
+function isRecord(obj) {
+  return typeof obj === "object" && obj !== null;
+}
 function parseStreamLine(raw) {
   const trimmed = raw.trim();
   if (!trimmed)
@@ -989,7 +996,7 @@ function parseStreamLine(raw) {
   } catch {
     return { kind: "error", message: `stream parse error: ${truncate2(trimmed, 120)}` };
   }
-  if (!obj || typeof obj !== "object")
+  if (!isRecord(obj))
     return null;
   switch (obj.type) {
     case "system": {
@@ -1007,16 +1014,20 @@ function parseStreamLine(raw) {
   }
 }
 function mapAssistant(obj) {
-  const content = obj.message?.content;
+  const msg = obj.message;
+  if (!isRecord(msg))
+    return null;
+  const content = msg.content;
   if (!Array.isArray(content) || content.length === 0)
     return null;
   const block = content[0];
   if (block?.type === "tool_use") {
     if (block.name === "AskUserQuestion") {
+      const input = isRecord(block.input) ? block.input : {};
       return {
         kind: "ask_user",
-        question: String(block.input?.prompt ?? ""),
-        options: Array.isArray(block.input?.options) ? block.input.options.map(String) : [],
+        question: String(input.prompt ?? ""),
+        options: Array.isArray(input.options) ? input.options.map(String) : [],
         toolUseId: String(block.id ?? "")
       };
     }
@@ -1028,8 +1039,14 @@ function mapAssistant(obj) {
   return null;
 }
 function mapUserToolResult(obj) {
-  const block = obj.message?.content?.[0];
-  if (block?.type !== "tool_result")
+  const msg = obj.message;
+  if (!isRecord(msg))
+    return null;
+  const content = msg.content;
+  if (!Array.isArray(content))
+    return null;
+  const block = content[0];
+  if (!isRecord(block) || block.type !== "tool_result")
     return null;
   const isErr = Boolean(block.is_error);
   const preview = typeof block.content === "string" ? truncate2(block.content, PREVIEW_MAX) : void 0;
@@ -9169,13 +9186,13 @@ var WikiController = class {
   cancelCurrent() {
     if (this.current) {
       this.current.abort();
-      new import_obsidian4.Notice("\u041E\u0442\u043C\u0435\u043D\u0430\u2026");
+      new import_obsidian4.Notice("Cancelling\u2026");
     }
   }
   async ingestActive(domainId) {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
-      new import_obsidian4.Notice("\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430");
+      new import_obsidian4.Notice("No active file");
       return;
     }
     const abs = this.app.vault.adapter.getFullPath(file.path);
@@ -9226,25 +9243,25 @@ var WikiController = class {
     if (this.plugin.settings.backend === "claude-code") {
       const sp = this.requireSkillPath();
       if (!sp)
-        return { ok: false, error: "\u043F\u0443\u0442\u044C \u043A \u043D\u0430\u0432\u044B\u043A\u0443 \u043D\u0435 \u0437\u0430\u0434\u0430\u043D" };
+        return { ok: false, error: "skill path is not set" };
     }
     const vaultBase = this.app.vault.adapter.getBasePath?.() ?? "";
     const repoRoot = this.plugin.settings.backend === "native-agent" ? vaultBase : resolveCwd(this.plugin.settings) ?? "";
     const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), repoRoot, input);
     if (r.ok)
-      new import_obsidian4.Notice(`\u0414\u043E\u043C\u0435\u043D \xAB${input.id}\xBB \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D`);
+      new import_obsidian4.Notice(`Domain \xAB${input.id}\xBB added`);
     else
-      new import_obsidian4.Notice(`\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D: ${r.error}`);
+      new import_obsidian4.Notice(`Failed to add domain: ${r.error}`);
     return r;
   }
   requireSkillPath() {
     const sp = resolveSkillPath(this.plugin.settings);
     if (!sp) {
-      new import_obsidian4.Notice("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0443\u0442\u044C \u043A \u043D\u0430\u0432\u044B\u043A\u0443 llm-wiki \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445");
+      new import_obsidian4.Notice("Set the LLM Wiki skill path in settings");
       return null;
     }
     if (!(0, import_node_fs2.existsSync)(sp)) {
-      new import_obsidian4.Notice(`\u041F\u0430\u043F\u043A\u0430 \u043D\u0430\u0432\u044B\u043A\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430: ${sp}`);
+      new import_obsidian4.Notice(`Skill folder not found: ${sp}`);
       return null;
     }
     return sp;
@@ -9252,17 +9269,17 @@ var WikiController = class {
   requireIclaude() {
     const p = this.plugin.settings.iclaudePath;
     if (!p) {
-      new import_obsidian4.Notice("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0443\u0442\u044C \u043A Claude Code \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445");
+      new import_obsidian4.Notice("Set the Claude Code path in settings");
       return null;
     }
     if (!(0, import_node_fs2.existsSync)(p)) {
-      new import_obsidian4.Notice(`Claude Code \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D: ${p}`);
+      new import_obsidian4.Notice(`Claude Code not found: ${p}`);
       return null;
     }
     try {
       (0, import_node_fs2.statSync)(p);
     } catch {
-      new import_obsidian4.Notice(`Claude Code \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: ${p}`);
+      new import_obsidian4.Notice(`Claude Code unavailable: ${p}`);
       return null;
     }
     return p;
@@ -9291,7 +9308,7 @@ var WikiController = class {
   }
   async dispatch(op, args, domainId) {
     if (this.isBusy()) {
-      new import_obsidian4.Notice("\u0423\u0436\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F, \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u0435 \u0435\u0451 \u0441\u043D\u0430\u0447\u0430\u043B\u0430");
+      new import_obsidian4.Notice("Operation in progress, cancel it first");
       return;
     }
     if (this.plugin.settings.backend === "claude-code" && !this.requireSkillPath())
@@ -9368,7 +9385,7 @@ var WikiController = class {
       }
     } catch (err) {
       status = "error";
-      finalText = `\u041E\u0448\u0438\u0431\u043A\u0430: ${err.message}`;
+      finalText = `Error: ${err.message}`;
       this.logEvent(sessionId, op, domainId, { kind: "error", message: finalText });
     } finally {
       this.current = null;
@@ -9422,7 +9439,7 @@ var WikiController = class {
     const view = leaves[0]?.view;
     return view instanceof LlmWikiView ? view : null;
   }
-  async toVaultPath(spawnCwd, savedPath) {
+  toVaultPath(spawnCwd, savedPath) {
     const vaultDir = this.app.vault.adapter.getBasePath?.() ?? "";
     const abs = (0, import_node_path6.isAbsolute)(savedPath) ? savedPath : (0, import_node_path6.join)(spawnCwd ?? vaultDir, savedPath);
     const rel = (0, import_node_path6.relative)(vaultDir, abs);
@@ -9453,7 +9470,7 @@ var LlmWikiPlugin = class extends import_obsidian5.Plugin {
     });
     this.addCommand({
       id: "open-panel",
-      name: "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C",
+      name: "Open panel",
       callback: () => {
         const right = this.app.workspace.getRightLeaf(false);
         if (right)
@@ -9462,22 +9479,22 @@ var LlmWikiPlugin = class extends import_obsidian5.Plugin {
     });
     this.addCommand({
       id: "ingest-current",
-      name: "Ingest \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430",
+      name: "Ingest active file",
       callback: () => void this.controller.ingestActive()
     });
     this.addCommand({
       id: "query",
-      name: "Query (\u0432\u043E\u043F\u0440\u043E\u0441)",
+      name: "Query",
       callback: () => new QueryModal(this.app, false, (q) => void this.controller.query(q, false)).open()
     });
     this.addCommand({
       id: "query-save",
-      name: "Query + \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u0430\u043A \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443",
+      name: "Query and save as page",
       callback: () => new QueryModal(this.app, true, (q) => void this.controller.query(q, true)).open()
     });
     this.addCommand({
       id: "lint",
-      name: "Lint \u0434\u043E\u043C\u0435\u043D\u0430",
+      name: "Lint domain",
       callback: () => {
         const domains = this.controller.loadDomains();
         new DomainModal(
@@ -9492,7 +9509,7 @@ var LlmWikiPlugin = class extends import_obsidian5.Plugin {
     });
     this.addCommand({
       id: "init",
-      name: "Init \u0434\u043E\u043C\u0435\u043D\u0430",
+      name: "Init domain",
       callback: () => {
         const domains = this.controller.loadDomains();
         new DomainModal(
@@ -9507,15 +9524,15 @@ var LlmWikiPlugin = class extends import_obsidian5.Plugin {
     });
     this.addCommand({
       id: "cancel",
-      name: "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044E",
+      name: "Cancel operation",
       callback: () => this.controller.cancelCurrent()
     });
     this.addSettingTab(new LlmWikiSettingTab(this.app, this));
-    console.log("[llm-wiki] loaded");
+    console.debug("[llm-wiki] loaded");
   }
   async onunload() {
     this.controller.cancelCurrent();
-    console.log("[llm-wiki] unloaded");
+    console.debug("[llm-wiki] unloaded");
   }
   async loadSettings() {
     const data = await this.loadData();
