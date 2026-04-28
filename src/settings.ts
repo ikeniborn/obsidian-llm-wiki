@@ -101,6 +101,61 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     if (Platform.isMobile) {
       containerEl.createEl("p", { text: "⚠ Mobile не поддерживается (нет child_process)." });
     }
+
+    containerEl.createEl("h2", { text: "Native Agent (beta)" });
+
+    new Setting(containerEl)
+      .setName("Backend")
+      .setDesc('Выберите "native-agent" для использования Ollama/OpenAI напрямую без Claude Code.')
+      .addDropdown((d) =>
+        d
+          .addOption("claude-code", "Claude Code (iclaude.sh)")
+          .addOption("native-agent", "Native Agent (OpenAI-compatible)")
+          .setValue(s.backend)
+          .onChange(async (v) => {
+            s.backend = v as "claude-code" | "native-agent";
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Base URL")
+      .setDesc("OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1")
+      .addText((t) =>
+        t
+          .setPlaceholder("http://localhost:11434/v1")
+          .setValue(s.nativeAgent.baseUrl)
+          .onChange(async (v) => {
+            s.nativeAgent.baseUrl = v.trim();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("API Key")
+      .setDesc('Для Ollama введите "ollama". Для OpenAI — ключ sk-...')
+      .addText((t) =>
+        t
+          .setPlaceholder("ollama")
+          .setValue(s.nativeAgent.apiKey)
+          .onChange(async (v) => {
+            s.nativeAgent.apiKey = v.trim();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Model")
+      .setDesc("Имя модели: llama3.2, mistral, gpt-4o и т.п.")
+      .addText((t) =>
+        t
+          .setPlaceholder("llama3.2")
+          .setValue(s.nativeAgent.model)
+          .onChange(async (v) => {
+            s.nativeAgent.model = v.trim();
+            await this.plugin.saveSettings();
+          }),
+      );
   }
 }
 
