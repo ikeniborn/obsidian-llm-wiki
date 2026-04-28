@@ -1,0 +1,101 @@
+import { describe, it, expect, vi } from "vitest";
+import { runQuery } from "../../src/phases/query";
+import { VaultTools, type VaultAdapter } from "../../src/vault-tools";
+import type OpenAI from "openai";
+import type { DomainEntry } from "../../src/domain-map";
+
+function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
+  return {
+    read: vi.fn().mockResolvedValue(""),
+    write: vi.fn().mockResolvedValue(undefined),
+    list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+    exists: vi.fn().mockResolvedValue(true),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
+function makeLlm(answer: string): OpenAI {
+  return {
+    chat: {
+      completions: {
+        create: vi.fn().mockResolvedValue({
+          [Symbol.asyncIterator]: async function* () {
+            yield { choices: [{ delta: { content: answer } }] };
+          },
+        }),
+      },
+    },
+  } as unknown as OpenAI;
+}
+
+async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const e of gen) out.push(e);
+  return out;
+}
+
+const domain: DomainEntry = {
+  id: "work",
+  name: "Work",
+  wiki_folder: "vaults/Work/!Wiki/work",
+  source_paths: [],
+};
+
+describe("runQuery", () => {
+  it("yields error when question is empty", async () => {
+    const vt = new VaultTools(mockAdapter(), "/vault");
+    const events = await collect(
+      runQuery([], false, vt, makeLlm("answer"), "model", [domain], "/vault", new AbortController().signal),
+    );
+    expect(events.some((e: any) => e.kind === "error")).toBe(true);
+  });
+
+  it("yields result with LLM answer", async () => {
+    const adapter = mockAdapter({
+      exists: vi.fn().mockResolvedValue(true),
+      list: vi.fn().mockResolvedValue({ files: ["vaults/Work/!Wiki/work/Page.md"], folders: [] }),
+      read: vi.fn().mockResolvedValue("# Page\n\nSome fact."),
+    });
+    const vt = new VaultTools(adapter, "/vault");
+    const events = await collect(
+      runQuery(
+        ["What is the answer?"],
+        false,
+        vt,
+        makeLlm("The answer is 42."),
+        "model",
+        [domain],
+        "/vault",
+        new AbortController().signal,
+      ),
+    );
+    const result = events.find((e: any) => e.kind === "result") as any;
+    expect(result).toBeDefined();
+    expect(result.text).toContain("42");
+  });
+
+  it("saves answer page when save=true", async () => {
+    const adapter = mockAdapter({
+      exists: vi.fn().mockResolvedValue(true),
+      list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+      read: vi.fn().mockResolvedValue(""),
+    });
+    const vt = new VaultTools(adapter, "/vault");
+    await collect(
+      runQuery(
+        ["What is X?"],
+        true,
+        vt,
+        makeLlm("X is Y."),
+        "model",
+        [domain],
+        "/vault",
+        new AbortController().signal,
+      ),
+    );
+    expect(adapter.write).toHaveBeenCalled();
+    const [savedPath] = (adapter.write as any).mock.calls[0];
+    expect(savedPath).toMatch(/\.md$/);
+  });
+});
