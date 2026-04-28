@@ -342,7 +342,7 @@ export class LlmWikiView extends ItemView {
         this.finalEl.empty();
         const comp = new Component();
         comp.load();
-        MarkdownRenderer.render(this.app, it.finalText || "(пусто)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
+        void MarkdownRenderer.render(this.app, it.finalText || "(пусто)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
       });
     }
     if (items.length === 0) {
