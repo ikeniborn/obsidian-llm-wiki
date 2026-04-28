@@ -7,6 +7,8 @@ import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
 import { readDomains, addDomain, type DomainEntry, type AddDomainInput } from "./domain-map";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
+import { AgentRunner } from "./agent-runner";
+import { VaultTools, type VaultAdapter } from "./vault-tools";
 
 export class WikiController {
   private current: AbortController | null = null;
@@ -94,14 +96,32 @@ export class WikiController {
     return p;
   }
 
+  private buildAgentRunner(): AgentRunner | null {
+    const skillPath = resolveSkillPath(this.plugin.settings);
+    if (!skillPath) { new Notice("Укажите путь к навыку llm-wiki в настройках"); return null; }
+
+    const adapter = this.app.vault.adapter as unknown as VaultAdapter;
+    const basePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+    const vaultTools = new VaultTools(adapter, basePath);
+    const vaultName = this.app.vault.getName();
+    const domains = readDomains(skillPath, vaultName);
+
+    return new AgentRunner(this.plugin.settings, vaultTools, vaultName, domains);
+  }
+
   private async dispatch(op: WikiOperation, args: string[]): Promise<void> {
     if (this.isBusy()) {
       new Notice("Уже выполняется операция, отмените её сначала");
       return;
     }
     if (!this.requireSkillPath()) return;
-    const iclaudePath = this.requireIclaude();
-    if (!iclaudePath) return;
+
+    // iclaudePath нужен только для claude-code backend
+    let iclaudePath: string | null = null;
+    if (this.plugin.settings.backend !== "native-agent") {
+      iclaudePath = this.requireIclaude();
+      if (!iclaudePath) return;
+    }
 
     await this.ensureView();
     const view = this.activeView();
@@ -119,24 +139,36 @@ export class WikiController {
 
     const spawnCwd = resolveCwd(this.plugin.settings) ?? undefined;
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1000;
-    const runner = new IclaudeRunner({
-      iclaudePath,
-      allowedTools: this.plugin.settings.allowedTools,
-      model: this.plugin.settings.model,
-    });
+
+    let claudeRunner: IclaudeRunner | null = null;
+    let runGen: AsyncGenerator<RunEvent, void, void>;
+
+    if (this.plugin.settings.backend === "native-agent") {
+      const agentRunner = this.buildAgentRunner();
+      if (!agentRunner) return;
+      runGen = agentRunner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs });
+    } else {
+      claudeRunner = new IclaudeRunner({
+        iclaudePath: iclaudePath!,
+        allowedTools: this.plugin.settings.allowedTools,
+        model: this.plugin.settings.model,
+      });
+      runGen = claudeRunner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs });
+    }
 
     try {
-      for await (const ev of runner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs })) {
+      for await (const ev of runGen) {
         if (ev.kind === "ask_user") {
           view.appendEvent(ev);
-          try {
-            const answer = await view.showQuestionModal(ev.question, ev.options);
-            if (!runner.sendToolResult(ev.toolUseId, answer)) {
-              // process already exited before answer was delivered — abort will drain the loop
+          if (claudeRunner) {
+            try {
+              const answer = await view.showQuestionModal(ev.question, ev.options);
+              if (!claudeRunner.sendToolResult(ev.toolUseId, answer)) {
+                ctrl.abort();
+              }
+            } catch {
               ctrl.abort();
             }
-          } catch {
-            ctrl.abort();
           }
           continue;
         }
