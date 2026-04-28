@@ -2,6 +2,10 @@ import type { RunEvent } from "./types";
 
 const PREVIEW_MAX = 200;
 
+function isRecord(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === "object" && obj !== null;
+}
+
 export function parseStreamLine(raw: string): RunEvent | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -11,14 +15,14 @@ export function parseStreamLine(raw: string): RunEvent | null {
   // с '{' — остальное молча игнорируем, чтобы не засорять панель.
   if (!trimmed.startsWith("{")) return null;
 
-  let obj: any;
+  let obj: unknown;
   try {
     obj = JSON.parse(trimmed);
   } catch {
     return { kind: "error", message: `stream parse error: ${truncate(trimmed, 120)}` };
   }
 
-  if (!obj || typeof obj !== "object") return null;
+  if (!isRecord(obj)) return null;
 
   switch (obj.type) {
     case "system": {
@@ -36,18 +40,21 @@ export function parseStreamLine(raw: string): RunEvent | null {
   }
 }
 
-function mapAssistant(obj: any): RunEvent | null {
-  const content = obj.message?.content;
+function mapAssistant(obj: Record<string, unknown>): RunEvent | null {
+  const msg = obj.message;
+  if (!isRecord(msg)) return null;
+  const content = msg.content;
   if (!Array.isArray(content) || content.length === 0) return null;
   // одна строка stream-json несёт один блок (один tool_use или один text-чанк)
-  const block = content[0];
+  const block = content[0] as Record<string, unknown>;
   if (block?.type === "tool_use") {
     if (block.name === "AskUserQuestion") {
+      const input = isRecord(block.input) ? block.input : {};
       return {
         kind: "ask_user",
-        question: String(block.input?.prompt ?? ""),
-        options: Array.isArray(block.input?.options)
-          ? (block.input.options as unknown[]).map(String)
+        question: String(input.prompt ?? ""),
+        options: Array.isArray(input.options)
+          ? (input.options as unknown[]).map(String)
           : [],
         toolUseId: String(block.id ?? ""),
       };
@@ -60,15 +67,19 @@ function mapAssistant(obj: any): RunEvent | null {
   return null;
 }
 
-function mapUserToolResult(obj: any): RunEvent | null {
-  const block = obj.message?.content?.[0];
-  if (block?.type !== "tool_result") return null;
+function mapUserToolResult(obj: Record<string, unknown>): RunEvent | null {
+  const msg = obj.message;
+  if (!isRecord(msg)) return null;
+  const content = msg.content;
+  if (!Array.isArray(content)) return null;
+  const block = content[0];
+  if (!isRecord(block) || block.type !== "tool_result") return null;
   const isErr = Boolean(block.is_error);
   const preview = typeof block.content === "string" ? truncate(block.content, PREVIEW_MAX) : undefined;
   return { kind: "tool_result", ok: !isErr, preview };
 }
 
-function mapResult(obj: any): RunEvent {
+function mapResult(obj: Record<string, unknown>): RunEvent {
   if (obj.is_error || obj.subtype === "error") {
     return { kind: "error", message: String(obj.result ?? obj.error ?? "claude error") };
   }
