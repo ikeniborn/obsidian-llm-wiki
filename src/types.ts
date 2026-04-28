@@ -13,13 +13,14 @@ export interface RunRequest {
   cwd: string | undefined;
   signal: AbortSignal;
   timeoutMs: number;
+  domainId?: string;
 }
 
 export type RunEvent =
   | { kind: "system"; message: string }
   | { kind: "tool_use"; name: string; input: unknown }
   | { kind: "tool_result"; ok: boolean; preview?: string }
-  | { kind: "assistant_text"; delta: string }
+  | { kind: "assistant_text"; delta: string; isReasoning?: boolean }
   | { kind: "result"; durationMs: number; usdCost?: number; text: string }
   | { kind: "error"; message: string }
   | { kind: "exit"; code: number }
@@ -34,6 +35,14 @@ export interface RunHistoryEntry {
   status: "done" | "error" | "cancelled";
   finalText: string;
   steps: Array<{ kind: "tool_use" | "tool_result"; label: string }>;
+}
+
+export interface LlmCallOptions {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number | null;
+  systemPrompt?: string;
+  numCtx?: number | null;
 }
 
 export interface LlmWikiPluginSettings {
@@ -52,10 +61,18 @@ export interface LlmWikiPluginSettings {
   };
   history: RunHistoryEntry[];
   backend: "claude-code" | "native-agent";
+  agentLogPath: string;
   nativeAgent: {
     baseUrl: string;
     apiKey: string;
     model: string;
+    temperature: number;
+    maxTokens: number;
+    requestTimeoutSec: number;
+    topP: number | null;
+    systemPrompt: string;
+    numCtx: number | null;
+    domainMapDir: string; // "" = авто: <vault>/.obsidian/plugins/llm-wiki/
   };
 }
 
@@ -77,9 +94,17 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
   history: [],
   backend: "claude-code",
+  agentLogPath: "",
   nativeAgent: {
     baseUrl: "http://localhost:11434/v1",
     apiKey: "ollama",
     model: "llama3.2",
+    temperature: 0.2,
+    maxTokens: 4096,
+    requestTimeoutSec: 300,
+    topP: null,
+    systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
+    numCtx: null,
+    domainMapDir: "",
   },
 };

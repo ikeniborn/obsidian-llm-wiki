@@ -27,11 +27,11 @@ __export(domain_map_exports, {
   domainMapPath: () => domainMapPath,
   readDomains: () => readDomains
 });
-function domainMapPath(skillPath, vaultName) {
-  return (0, import_node_path2.join)(skillPath, "shared", `domain-map-${vaultName}.json`);
+function domainMapPath(dir, vaultName) {
+  return (0, import_node_path2.join)(dir, `domain-map-${vaultName}.json`);
 }
-function readDomains(skillPath, vaultName) {
-  const p = domainMapPath(skillPath, vaultName);
+function readDomains(dir, vaultName) {
+  const p = domainMapPath(dir, vaultName);
   if (!(0, import_node_fs.existsSync)(p))
     return [];
   try {
@@ -48,17 +48,16 @@ function readDomains(skillPath, vaultName) {
     return [];
   }
 }
-function addDomain(skillPath, vaultName, repoRoot, input) {
+function addDomain(dir, vaultName, repoRoot, input) {
   const id = input.id.trim();
   if (!id)
     return { ok: false, error: "ID \u0434\u043E\u043C\u0435\u043D\u0430 \u043F\u0443\u0441\u0442" };
   if (!/^[\p{L}\p{N}_\-]+$/u.test(id))
     return { ok: false, error: "ID \u0434\u043E\u043F\u0443\u0441\u043A\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B/\u0446\u0438\u0444\u0440\u044B/_/-" };
-  const p = domainMapPath(skillPath, vaultName);
-  const sharedDir = (0, import_node_path2.join)(skillPath, "shared");
+  const p = domainMapPath(dir, vaultName);
   let data;
   if (!(0, import_node_fs.existsSync)(p)) {
-    (0, import_node_fs.mkdirSync)(sharedDir, { recursive: true });
+    (0, import_node_fs.mkdirSync)(dir, { recursive: true });
     data = {
       vault: vaultName,
       wiki_root: `vaults/${vaultName}/!Wiki`,
@@ -142,7 +141,8 @@ var DEFAULT_SETTINGS = {
     requestTimeoutSec: 300,
     topP: null,
     systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
-    numCtx: null
+    numCtx: null,
+    domainMapDir: ""
   }
 };
 
@@ -304,6 +304,12 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
         });
         return t;
       });
+      new import_obsidian.Setting(containerEl).setName("\u041F\u0430\u043F\u043A\u0430 domain-map").setDesc("\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/.obsidian/plugins/llm-wiki/").addText(
+        (t) => t.setPlaceholder("(\u0430\u0432\u0442\u043E)").setValue(s.nativeAgent.domainMapDir).onChange(async (v) => {
+          s.nativeAgent.domainMapDir = v.trim();
+          await this.plugin.saveSettings();
+        })
+      );
     }
     new import_obsidian.Setting(containerEl).setName("\u041B\u0438\u043C\u0438\u0442 \u0438\u0441\u0442\u043E\u0440\u0438\u0438").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439 \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u0431\u043E\u043A\u043E\u0432\u043E\u0439 \u043F\u0430\u043D\u0435\u043B\u0438.").addText(
       (t) => t.setValue(String(s.historyLimit)).onChange(async (v) => {
@@ -9197,19 +9203,34 @@ var WikiController = class {
     const args = dryRun ? [domain, "--dry-run"] : [domain];
     await this.dispatch("init", args);
   }
-  /** Список доменов из domain-map-<vault>.json. Пустой массив, если путь к навыку не задан. */
+  resolveDomainMapDir() {
+    const s = this.plugin.settings;
+    if (s.backend === "native-agent") {
+      if (s.nativeAgent.domainMapDir)
+        return s.nativeAgent.domainMapDir;
+      const base = this.app.vault.adapter.getBasePath?.() ?? "";
+      return (0, import_node_path6.join)(base, ".obsidian", "plugins", "llm-wiki");
+    }
+    return (0, import_node_path6.join)(resolveSkillPath(s) ?? "", "shared");
+  }
+  /** Список доменов из domain-map-<vault>.json. */
   loadDomains() {
-    const sp = resolveSkillPath(this.plugin.settings);
-    if (!sp)
-      return [];
-    return readDomains(sp, this.app.vault.getName());
+    if (this.plugin.settings.backend === "claude-code") {
+      const sp = resolveSkillPath(this.plugin.settings);
+      if (!sp)
+        return [];
+    }
+    return readDomains(this.resolveDomainMapDir(), this.app.vault.getName());
   }
   registerDomain(input) {
-    const sp = this.requireSkillPath();
-    if (!sp)
-      return { ok: false, error: "\u043F\u0443\u0442\u044C \u043A \u043D\u0430\u0432\u044B\u043A\u0443 \u043D\u0435 \u0437\u0430\u0434\u0430\u043D" };
-    const repoRoot = resolveCwd(this.plugin.settings) ?? "";
-    const r = addDomain(sp, this.app.vault.getName(), repoRoot, input);
+    if (this.plugin.settings.backend === "claude-code") {
+      const sp = this.requireSkillPath();
+      if (!sp)
+        return { ok: false, error: "\u043F\u0443\u0442\u044C \u043A \u043D\u0430\u0432\u044B\u043A\u0443 \u043D\u0435 \u0437\u0430\u0434\u0430\u043D" };
+    }
+    const vaultBase = this.app.vault.adapter.getBasePath?.() ?? "";
+    const repoRoot = this.plugin.settings.backend === "native-agent" ? vaultBase : resolveCwd(this.plugin.settings) ?? "";
+    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), repoRoot, input);
     if (r.ok)
       new import_obsidian4.Notice(`\u0414\u043E\u043C\u0435\u043D \xAB${input.id}\xBB \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D`);
     else
@@ -9247,16 +9268,11 @@ var WikiController = class {
     return p;
   }
   buildAgentRunner() {
-    const skillPath = resolveSkillPath(this.plugin.settings);
-    if (!skillPath) {
-      new import_obsidian4.Notice("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0443\u0442\u044C \u043A \u043D\u0430\u0432\u044B\u043A\u0443 llm-wiki \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445");
-      return null;
-    }
     const adapter = this.app.vault.adapter;
     const basePath = this.app.vault.adapter.getBasePath?.() ?? "";
     const vaultTools = new VaultTools(adapter, basePath);
     const vaultName = this.app.vault.getName();
-    const domains = readDomains(skillPath, vaultName);
+    const domains = readDomains(this.resolveDomainMapDir(), vaultName);
     return new AgentRunner(this.plugin.settings, vaultTools, vaultName, domains);
   }
   logEvent(sessionId, op, domainId, ev) {
@@ -9278,7 +9294,7 @@ var WikiController = class {
       new import_obsidian4.Notice("\u0423\u0436\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F, \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u0435 \u0435\u0451 \u0441\u043D\u0430\u0447\u0430\u043B\u0430");
       return;
     }
-    if (!this.requireSkillPath())
+    if (this.plugin.settings.backend === "claude-code" && !this.requireSkillPath())
       return;
     let iclaudePath = null;
     if (this.plugin.settings.backend !== "native-agent") {
