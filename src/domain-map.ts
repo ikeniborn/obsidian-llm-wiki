@@ -1,31 +1,37 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+export interface EntityType {
+  type: string;
+  description: string;
+  extraction_cues: string[];
+  min_mentions_for_page?: number;
+  wiki_subfolder?: string;
+}
+
 export interface DomainEntry {
   id: string;
   name: string;
   wiki_folder: string;
   source_paths?: string[];
+  entity_types?: EntityType[];
+  language_notes?: string;
 }
 
 interface DomainMapFile {
   vault?: string;
   wiki_root?: string;
-  domains: Array<DomainEntry & {
-    entity_types?: unknown[];
-    tags?: string[];
-    language_notes?: string;
-  }>;
+  domains: Array<DomainEntry & { tags?: string[] }>;
   [key: string]: unknown;
 }
 
-/** skillPath — полный путь к папке навыка; vaultName — имя волта из app.vault.getName(). */
-export function domainMapPath(skillPath: string, vaultName: string): string {
-  return join(skillPath, "shared", `domain-map-${vaultName}.json`);
+/** dir — готовая директория хранения (без вложенного shared/). */
+export function domainMapPath(dir: string, vaultName: string): string {
+  return join(dir, `domain-map-${vaultName}.json`);
 }
 
-export function readDomains(skillPath: string, vaultName: string): DomainEntry[] {
-  const p = domainMapPath(skillPath, vaultName);
+export function readDomains(dir: string, vaultName: string): DomainEntry[] {
+  const p = domainMapPath(dir, vaultName);
   if (!existsSync(p)) return [];
   try {
     const data = JSON.parse(readFileSync(p, "utf-8")) as DomainMapFile;
@@ -34,6 +40,8 @@ export function readDomains(skillPath: string, vaultName: string): DomainEntry[]
       name: d.name ?? d.id,
       wiki_folder: d.wiki_folder ?? "",
       source_paths: d.source_paths ?? [],
+      entity_types: d.entity_types ?? [],
+      language_notes: d.language_notes ?? "",
     }));
   } catch {
     return [];
@@ -52,7 +60,7 @@ export interface AddDomainInput {
  * Создаёт файл если не существует.
  */
 export function addDomain(
-  skillPath: string,
+  dir: string,
   vaultName: string,
   repoRoot: string,
   input: AddDomainInput,
@@ -61,12 +69,11 @@ export function addDomain(
   if (!id) return { ok: false, error: "ID домена пуст" };
   if (!/^[\p{L}\p{N}_\-]+$/u.test(id)) return { ok: false, error: "ID допускает только буквы/цифры/_/-" };
 
-  const p = domainMapPath(skillPath, vaultName);
-  const sharedDir = join(skillPath, "shared");
+  const p = domainMapPath(dir, vaultName);
 
   let data: DomainMapFile;
   if (!existsSync(p)) {
-    mkdirSync(sharedDir, { recursive: true });
+    mkdirSync(dir, { recursive: true });
     data = {
       vault: vaultName,
       wiki_root: `vaults/${vaultName}/!Wiki`,
