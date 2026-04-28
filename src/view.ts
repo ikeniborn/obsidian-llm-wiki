@@ -35,6 +35,8 @@ export class LlmWikiView extends ItemView {
   private currentToolStartedAt = 0;
   private assistantBlock: HTMLElement | null = null;
   private assistantBuffer = "";
+  private reasoningBlock: HTMLElement | null = null;
+  private reasoningBuffer = "";
 
   constructor(leaf: WorkspaceLeaf, private plugin: LlmWikiPlugin) {
     super(leaf);
@@ -44,7 +46,7 @@ export class LlmWikiView extends ItemView {
   getDisplayText(): string { return "LLM Wiki"; }
   getIcon(): string { return "brain-circuit"; }
 
-  async onOpen(): Promise<void> {
+  onOpen(): void {
     const root = this.containerEl.children[1];
     root.empty();
     root.addClass("llm-wiki-view");
@@ -71,10 +73,11 @@ export class LlmWikiView extends ItemView {
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
       if (!file) { new Notice("Нет активного файла"); return; }
+      const domainId = this.domainSelect.value || undefined;
       new ConfirmModal(this.plugin.app, "Ingest — подтверждение", [
         `Файл: ${file.name}`,
         "Claude прочитает файл, извлечёт сущности и обновит wiki-страницы домена.",
-      ], () => this.plugin.controller.ingestActive()).open();
+      ], () => this.plugin.controller.ingestActive(domainId)).open();
     });
     this.lintBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
@@ -135,7 +138,7 @@ export class LlmWikiView extends ItemView {
     this.renderHistory();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): void {
     if (this.tickHandle !== null) window.clearInterval(this.tickHandle);
   }
 
@@ -175,7 +178,7 @@ export class LlmWikiView extends ItemView {
     const q = this.queryInput.value.trim();
     if (!q) { new Notice("Введите вопрос"); return; }
     if (this.state === "running") { new Notice("Уже выполняется операция"); return; }
-    void this.plugin.controller.query(q, save);
+    void this.plugin.controller.query(q, save, this.domainSelect.value || undefined);
     this.queryInput.value = "";
   }
 
@@ -197,6 +200,8 @@ export class LlmWikiView extends ItemView {
     this.currentToolStep = null;
     this.assistantBlock = null;
     this.assistantBuffer = "";
+    this.reasoningBlock = null;
+    this.reasoningBuffer = "";
     this.stepsOpen = true;
     this.stepsEl.style.display = "";
     this.progressToggle.setText("▼");
@@ -238,14 +243,25 @@ export class LlmWikiView extends ItemView {
       el.createSpan({ text: "⏳ Ожидание ответа…" });
       return;
     } else if (ev.kind === "assistant_text") {
-      if (!this.assistantBlock) {
-        this.assistantBlock = this.stepsEl.createDiv("llm-wiki-step assistant");
-        this.assistantBlock.createSpan({ cls: "llm-wiki-step-icon" }).setText("💬");
-        this.assistantBlock.createSpan({ cls: "llm-wiki-assistant-text" });
+      if (ev.isReasoning) {
+        if (!this.reasoningBlock) {
+          this.reasoningBlock = this.stepsEl.createDiv("llm-wiki-step reasoning");
+          this.reasoningBlock.createSpan({ cls: "llm-wiki-step-icon" }).setText("🧠");
+          this.reasoningBlock.createSpan({ cls: "llm-wiki-reasoning-text" });
+        }
+        this.reasoningBuffer += ev.delta;
+        const span = this.reasoningBlock.querySelector(".llm-wiki-reasoning-text") as HTMLElement | null;
+        if (span) span.setText(truncate(this.reasoningBuffer, ASSISTANT_TEXT_MAX));
+      } else {
+        if (!this.assistantBlock) {
+          this.assistantBlock = this.stepsEl.createDiv("llm-wiki-step assistant");
+          this.assistantBlock.createSpan({ cls: "llm-wiki-step-icon" }).setText("💬");
+          this.assistantBlock.createSpan({ cls: "llm-wiki-assistant-text" });
+        }
+        this.assistantBuffer += ev.delta;
+        const span = this.assistantBlock.querySelector(".llm-wiki-assistant-text") as HTMLElement | null;
+        if (span) span.setText(truncate(this.assistantBuffer, ASSISTANT_TEXT_MAX));
       }
-      this.assistantBuffer += ev.delta;
-      const span = this.assistantBlock.querySelector(".llm-wiki-assistant-text") as HTMLElement | null;
-      if (span) span.setText(truncate(this.assistantBuffer, ASSISTANT_TEXT_MAX));
       this.scrollSteps();
     } else if (ev.kind === "system") {
       const step = this.stepsEl.createDiv("llm-wiki-step");

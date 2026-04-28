@@ -49,7 +49,7 @@ export class WikiController {
     await this.dispatch(op, [question.trim()], domainId);
   }
 
-  async lint(domain: string | "all"): Promise<void> {
+  async lint(domain: string): Promise<void> {
     const args = domain === "all" ? [] : [domain];
     await this.dispatch("lint", args);
   }
@@ -280,7 +280,7 @@ export class WikiController {
     return view instanceof LlmWikiView ? view : null;
   }
 
-  private async toVaultPath(spawnCwd: string | undefined, savedPath: string): Promise<string | null> {
+  private toVaultPath(spawnCwd: string | undefined, savedPath: string): string | null {
     const vaultDir = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     const abs = isAbsolute(savedPath) ? savedPath : join(spawnCwd ?? vaultDir, savedPath);
     const rel = relative(vaultDir, abs);

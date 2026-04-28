@@ -68,7 +68,7 @@ export default class LlmWikiPlugin extends Plugin {
       callback: () => {
         const domains = this.controller.loadDomains();
         new DomainModal(this.app, "Init", false, { dryRun: true }, domains,
-          (d, f) => void this.controller.init(d as string, f.dryRun ?? false)).open();
+          (d, f) => void this.controller.init(d, f.dryRun ?? false)).open();
       },
     });
 
@@ -80,12 +80,12 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.addSettingTab(new LlmWikiSettingTab(this.app, this));
 
-    console.log("[llm-wiki] loaded");
+    console.debug("[llm-wiki] loaded");
   }
 
   async onunload(): Promise<void> {
     this.controller.cancelCurrent();
-    console.log("[llm-wiki] unloaded");
+    console.debug("[llm-wiki] unloaded");
   }
 
   async loadSettings(): Promise<void> {
@@ -94,6 +94,7 @@ export default class LlmWikiPlugin extends Plugin {
       ...DEFAULT_SETTINGS,
       ...(data ?? {}),
       timeouts: { ...DEFAULT_SETTINGS.timeouts, ...(data?.timeouts ?? {}) },
+      nativeAgent: { ...DEFAULT_SETTINGS.nativeAgent, ...(data?.nativeAgent ?? {}) },
       allowedTools: data?.allowedTools ?? DEFAULT_SETTINGS.allowedTools,
       history: data?.history ?? [],
     };

@@ -67,7 +67,7 @@ export function addDomain(
 ): { ok: true } | { ok: false; error: string } {
   const id = input.id.trim();
   if (!id) return { ok: false, error: "ID домена пуст" };
-  if (!/^[\p{L}\p{N}_\-]+$/u.test(id)) return { ok: false, error: "ID допускает только буквы/цифры/_/-" };
+  if (!/^[\p{L}\p{N}_-]+$/u.test(id)) return { ok: false, error: "ID допускает только буквы/цифры/_/-" };
 
   const p = domainMapPath(dir, vaultName);
 

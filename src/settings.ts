@@ -14,7 +14,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     containerEl.empty();
     const s = this.plugin.settings;
 
-    containerEl.createEl("h2", { text: "LLM Wiki" });
+    new Setting(containerEl).setName("LLM Wiki").setHeading();
 
     new Setting(containerEl)
       .setName("Backend")
