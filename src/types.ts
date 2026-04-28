@@ -51,6 +51,12 @@ export interface LlmWikiPluginSettings {
     init: number;
   };
   history: RunHistoryEntry[];
+  backend: "claude-code" | "native-agent";
+  nativeAgent: {
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
 }
 
 /** Пресеты модели для UI; пользователь может ввести произвольное значение. */
@@ -70,4 +76,10 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   historyLimit: 20,
   timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
   history: [],
+  backend: "claude-code",
+  nativeAgent: {
+    baseUrl: "http://localhost:11434/v1",
+    apiKey: "ollama",
+    model: "llama3.2",
+  },
 };
