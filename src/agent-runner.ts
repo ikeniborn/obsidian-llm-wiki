@@ -34,40 +34,28 @@ export class AgentRunner {
     const model = this.settings.nativeAgent.model;
     const repoRoot = req.cwd ?? "";
     const skillPath = this.settings.cwd;
-    const start = Date.now();
-
-    let hasResult = false;
-    let phase: AsyncGenerator<RunEvent>;
 
     switch (req.operation) {
       case "ingest":
-        phase = runIngest(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runIngest(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
         break;
       case "query":
-        phase = runQuery(req.args, false, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runQuery(req.args, false, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
         break;
       case "query-save":
-        phase = runQuery(req.args, true, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runQuery(req.args, true, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
         break;
       case "lint":
-        phase = runLint(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runLint(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
         break;
       case "init":
-        phase = runInit(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, this.vaultName, skillPath, req.signal);
+        yield* runInit(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, this.vaultName, skillPath, req.signal);
         break;
       default:
+        const start = Date.now();
         yield { kind: "error", message: `Unknown operation: ${req.operation}` };
         yield { kind: "result", durationMs: Date.now() - start, text: "" };
         return;
-    }
-
-    for await (const event of phase) {
-      yield event;
-      if (event.kind === "result") hasResult = true;
-    }
-
-    if (!hasResult) {
-      yield { kind: "result", durationMs: Date.now() - start, text: "" };
     }
   }
 }

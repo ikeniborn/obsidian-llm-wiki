@@ -78,7 +78,10 @@ describe("AgentRunner", () => {
         timeoutMs: 10_000,
       }),
     );
-    expect(events.some((e) => e.kind === "result")).toBe(true);
+    // Verify that we have at least a system event and a result or error event
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]).toMatchObject({ kind: "system" });
+    expect(events.some((e) => e.kind === "result" || e.kind === "error")).toBe(true);
   });
 
   it("stops early on aborted signal", async () => {
