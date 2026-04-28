@@ -114,7 +114,7 @@ export async function* runInit(
     const { addDomain } = await import("../domain-map");
     const result = addDomain(skillPath, vaultName, repoRoot, {
       id: entry.id,
-      name: (entry as any).name ?? entry.id,
+      name: entry.name ?? entry.id,
       wikiFolder: entry.wiki_folder,
       sourcePaths: entry.source_paths ?? [],
     });
