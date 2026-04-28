@@ -128,7 +128,7 @@ export class LlmWikiView extends ItemView {
     progressHeader.addEventListener("click", () => this.toggleSteps());
 
     this.stepsEl = root.createDiv("llm-wiki-steps");
-    this.stepsEl.style.display = "none";
+    this.stepsEl.addClass("llm-wiki-hidden");
 
     root.createEl("h4", { text: "Результат" });
     this.finalEl = root.createDiv("llm-wiki-final");
@@ -203,7 +203,7 @@ export class LlmWikiView extends ItemView {
     this.reasoningBlock = null;
     this.reasoningBuffer = "";
     this.stepsOpen = true;
-    this.stepsEl.style.display = "";
+    this.stepsEl.removeClass("llm-wiki-hidden");
     this.progressToggle.setText("▼");
     this.updateMetrics();
     if (this.tickHandle !== null) window.clearInterval(this.tickHandle);
@@ -290,7 +290,7 @@ export class LlmWikiView extends ItemView {
     this.initBtn.disabled = false;
     if (this.tickHandle !== null) { window.clearInterval(this.tickHandle); this.tickHandle = null; }
     this.stepsOpen = false;
-    this.stepsEl.style.display = "none";
+    this.stepsEl.addClass("llm-wiki-hidden");
     this.progressToggle.setText("▶");
     this.updateMetrics();
     this.finalEl.empty();
@@ -304,7 +304,11 @@ export class LlmWikiView extends ItemView {
 
   private toggleSteps(): void {
     this.stepsOpen = !this.stepsOpen;
-    this.stepsEl.style.display = this.stepsOpen ? "" : "none";
+    if (this.stepsOpen) {
+      this.stepsEl.removeClass("llm-wiki-hidden");
+    } else {
+      this.stepsEl.addClass("llm-wiki-hidden");
+    }
     this.progressToggle.setText(this.stepsOpen ? "▼" : "▶");
   }
 
