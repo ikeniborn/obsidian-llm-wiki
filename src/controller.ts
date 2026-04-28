@@ -146,7 +146,8 @@ export class WikiController {
     if (this.plugin.settings.backend === "native-agent") {
       const agentRunner = this.buildAgentRunner();
       if (!agentRunner) return;
-      runGen = agentRunner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs });
+      const vaultBasePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? spawnCwd;
+      runGen = agentRunner.run({ operation: op, args, cwd: vaultBasePath, signal: ctrl.signal, timeoutMs });
     } else {
       claudeRunner = new IclaudeRunner({
         iclaudePath: iclaudePath!,
