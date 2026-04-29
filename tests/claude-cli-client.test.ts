@@ -86,8 +86,8 @@ describe("ClaudeCliClient", () => {
     );
 
     const args: string[] = (spawn as any).mock.calls[0][1];
-    expect(args).toContain("--system");
-    const sysIdx = args.indexOf("--system");
+    expect(args).toContain("--system-prompt");
+    const sysIdx = args.indexOf("--system-prompt");
     expect(args[sysIdx + 1]).toContain("be helpful");
   });
 

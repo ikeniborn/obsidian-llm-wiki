@@ -45,7 +45,7 @@ export class ClaudeCliClient implements LlmClient {
     const args: string[] = ["-p", userText, "--output-format", "stream-json", "--verbose"];
     if (model) args.push("--model", model);
     if (maxTokens) args.push("--max-tokens", String(maxTokens));
-    if (systemContent) args.push("--system", systemContent);
+    if (systemContent) args.push("--system-prompt", systemContent);
 
     if ((params as { stream?: boolean }).stream) {
       return Promise.resolve(this._makeIterable(args, opts?.signal, requestTimeoutSec));
@@ -78,10 +78,12 @@ export class ClaudeCliClient implements LlmClient {
     signal?.addEventListener("abort", onAbort, { once: true });
 
     const timeoutHandle = setTimeout(() => {
+      timedOut = true;
       child.kill("SIGTERM");
       setTimeout(() => { if (child.exitCode === null) child.kill("SIGKILL"); }, SIGTERM_GRACE_MS);
     }, timeoutSec * 1000);
 
+    let timedOut = false;
     const queue: OpenAI.Chat.ChatCompletionChunk[] = [];
     let resolveNext: ((v: void) => void) | null = null;
     const wake = () => { if (resolveNext) { resolveNext(); resolveNext = null; } };
@@ -97,7 +99,7 @@ export class ClaudeCliClient implements LlmClient {
         queue.push({
           id: `cc-${++id}`,
           object: "chat.completion.chunk",
-          model: "",
+          model: this.cfg.model || "claude",
           created: 0,
           choices: [{ index: 0, delta: delta as OpenAI.Chat.ChatCompletionChunk.Choice.Delta, finish_reason: null }],
         });
@@ -115,10 +117,11 @@ export class ClaudeCliClient implements LlmClient {
         if (exited) break;
         await new Promise<void>((r) => (resolveNext = r));
       }
+      if (timedOut) throw new Error(`claude process timed out after ${timeoutSec}s`);
       yield {
         id: `cc-${++id}`,
         object: "chat.completion.chunk",
-        model: "",
+        model: this.cfg.model || "claude",
         created: 0,
         choices: [{ index: 0, delta: {} as OpenAI.Chat.ChatCompletionChunk.Choice.Delta, finish_reason: "stop" }],
       };
@@ -126,6 +129,10 @@ export class ClaudeCliClient implements LlmClient {
       clearTimeout(timeoutHandle);
       signal?.removeEventListener("abort", onAbort);
       rl.close();
+      if (child.exitCode === null) {
+        child.kill("SIGTERM");
+        setTimeout(() => { if (child.exitCode === null) child.kill("SIGKILL"); }, SIGTERM_GRACE_MS);
+      }
     }
   }
 
@@ -141,7 +148,7 @@ export class ClaudeCliClient implements LlmClient {
     return {
       id: "cc-0",
       object: "chat.completion",
-      model: "",
+      model: this.cfg.model || "claude",
       created: 0,
       choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop", logprobs: null }],
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },

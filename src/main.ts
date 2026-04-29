@@ -100,14 +100,12 @@ export default class LlmWikiPlugin extends Plugin {
     } as LlmWikiPluginSettings;
 
     // Миграция с claude-code backend
-    if ((data?.backend as string) === "claude-code" || !this.settings.claudeAgent.iclaudePath) {
-      if ((data?.backend as string) === "claude-code") {
-        this.settings.backend = "claude-agent";
-      }
-      if (data?.iclaudePath && !this.settings.claudeAgent.iclaudePath) {
+    if ((data?.backend as string) === "claude-code") {
+      this.settings.backend = "claude-agent";
+      if (data.iclaudePath && !this.settings.claudeAgent.iclaudePath) {
         this.settings.claudeAgent.iclaudePath = data.iclaudePath as string;
       }
-      if (data?.model && !this.settings.claudeAgent.model) {
+      if (data.model && !this.settings.claudeAgent.model) {
         this.settings.claudeAgent.model = data.model as string;
       }
     }

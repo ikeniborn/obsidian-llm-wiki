@@ -77,7 +77,7 @@ export class WikiController {
     return p;
   }
 
-  private buildAgentRunner(): AgentRunner | null {
+  private buildAgentRunner(): AgentRunner {
     const adapter = this.app.vault.adapter as unknown as VaultAdapter;
     const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     const vaultTools = new VaultTools(adapter, base);
@@ -124,7 +124,6 @@ export class WikiController {
     if (!view) return;
 
     const agentRunner = this.buildAgentRunner();
-    if (!agentRunner) return;
 
     const ctrl = new AbortController();
     this.current = ctrl;
