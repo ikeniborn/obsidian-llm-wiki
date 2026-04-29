@@ -1,46 +1,33 @@
 import { App, Notice, TFile } from "obsidian";
-import { existsSync, statSync, appendFileSync } from "node:fs";
+import { existsSync, appendFileSync, statSync } from "node:fs";
 import { relative, isAbsolute, join } from "node:path";
-import { IclaudeRunner } from "./runner";
-import { resolveSkillPath, resolveCwd } from "./settings";
 import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
 import { readDomains, addDomain, type DomainEntry, type AddDomainInput } from "./domain-map";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
 import { AgentRunner } from "./agent-runner";
 import { VaultTools, type VaultAdapter } from "./vault-tools";
+import { ClaudeCliClient } from "./claude-cli-client";
+import OpenAI from "openai";
 
 export class WikiController {
   private current: AbortController | null = null;
   constructor(private app: App, private plugin: LlmWikiPlugin) {}
-
-  /** Путь к папке навыка (для UI: проверка "задан ли путь"). */
-  cwdOrEmpty(): string {
-    return resolveSkillPath(this.plugin.settings) ?? "";
-  }
 
   isBusy(): boolean { return this.current !== null; }
 
   cancelCurrent(): void {
     if (this.current) {
       this.current.abort();
-      new Notice("Cancelling…");
+      new Notice("Отмена…");
     }
   }
 
   async ingestActive(domainId?: string): Promise<void> {
     const file = this.app.workspace.getActiveFile();
-    if (!file) { new Notice("No active file"); return; }
+    if (!file) { new Notice("Нет активного файла"); return; }
     const abs = (this.app.vault.adapter as { getFullPath: (p: string) => string }).getFullPath(file.path);
-    const spawnCwd = resolveCwd(this.plugin.settings);
-    let filePath: string;
-    if (spawnCwd) {
-      const rel = relative(spawnCwd, abs);
-      filePath = (rel.startsWith("..") || isAbsolute(rel)) ? abs : rel;
-    } else {
-      filePath = abs;
-    }
-    await this.dispatch("ingest", [filePath], domainId);
+    await this.dispatch("ingest", [abs], domainId);
   }
 
   async query(question: string, save: boolean, domainId?: string): Promise<void> {
@@ -49,7 +36,7 @@ export class WikiController {
     await this.dispatch(op, [question.trim()], domainId);
   }
 
-  async lint(domain: string): Promise<void> {
+  async lint(domain: string | "all"): Promise<void> {
     const args = domain === "all" ? [] : [domain];
     await this.dispatch("lint", args);
   }
@@ -61,53 +48,30 @@ export class WikiController {
 
   private resolveDomainMapDir(): string {
     const s = this.plugin.settings;
-    if (s.backend === "native-agent") {
-      if (s.nativeAgent.domainMapDir) return s.nativeAgent.domainMapDir;
-      const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-      return join(base, ".obsidian", "plugins", "llm-wiki");
-    }
-    return join(resolveSkillPath(s) ?? "", "shared");
+    const dir = s.backend === "claude-agent"
+      ? s.claudeAgent.domainMapDir
+      : s.nativeAgent.domainMapDir;
+    if (dir) return dir;
+    const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+    return join(base, ".obsidian", "plugins", "llm-wiki");
   }
 
-  /** Список доменов из domain-map-<vault>.json. */
   loadDomains(): DomainEntry[] {
-    if (this.plugin.settings.backend === "claude-code") {
-      const sp = resolveSkillPath(this.plugin.settings);
-      if (!sp) return [];
-    }
     return readDomains(this.resolveDomainMapDir(), this.app.vault.getName());
   }
 
   registerDomain(input: AddDomainInput): { ok: true } | { ok: false; error: string } {
-    if (this.plugin.settings.backend === "claude-code") {
-      const sp = this.requireSkillPath();
-      if (!sp) return { ok: false, error: "skill path is not set" };
-    }
     const vaultBase = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    const repoRoot = this.plugin.settings.backend === "native-agent"
-      ? vaultBase
-      : (resolveCwd(this.plugin.settings) ?? "");
-    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), repoRoot, input);
-    if (r.ok) new Notice(`Domain «${input.id}» added`);
-    else new Notice(`Failed to add domain: ${r.error}`);
+    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), vaultBase, input);
+    if (r.ok) new Notice(`Домен «${input.id}» добавлен`);
+    else new Notice(`Не удалось добавить домен: ${r.error}`);
     return r;
   }
 
-  private requireSkillPath(): string | null {
-    const sp = resolveSkillPath(this.plugin.settings);
-    if (!sp) { new Notice("Set the LLM Wiki skill path in settings"); return null; }
-    if (!existsSync(sp)) { new Notice(`Skill folder not found: ${sp}`); return null; }
-    return sp;
-  }
-
-  private requireIclaude(): string | null {
-    const p = this.plugin.settings.iclaudePath;
-    if (!p) { new Notice("Set the Claude Code path in settings"); return null; }
-    if (!existsSync(p)) { new Notice(`Claude Code not found: ${p}`); return null; }
-    try {
-      statSync(p);
-    } catch {
-      new Notice(`Claude Code unavailable: ${p}`);
+  private requireClaudeAgent(): string | null {
+    const p = this.plugin.settings.claudeAgent.iclaudePath;
+    if (!p || !existsSync(p)) {
+      new Notice("Укажите путь к Claude Code в настройках");
       return null;
     }
     return p;
@@ -115,45 +79,52 @@ export class WikiController {
 
   private buildAgentRunner(): AgentRunner | null {
     const adapter = this.app.vault.adapter as unknown as VaultAdapter;
-    const basePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    const vaultTools = new VaultTools(adapter, basePath);
+    const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+    const vaultTools = new VaultTools(adapter, base);
     const vaultName = this.app.vault.getName();
-    const domains = readDomains(this.resolveDomainMapDir(), vaultName);
+    const domainMapDir = this.resolveDomainMapDir();
+    const domains = readDomains(domainMapDir, vaultName);
+    const s = this.plugin.settings;
 
-    return new AgentRunner(this.plugin.settings, vaultTools, vaultName, domains);
+    const llm = s.backend === "claude-agent"
+      ? new ClaudeCliClient(s.claudeAgent)
+      : new OpenAI({
+          baseURL: s.nativeAgent.baseUrl,
+          apiKey: s.nativeAgent.apiKey,
+          timeout: s.nativeAgent.requestTimeoutSec * 1000,
+          dangerouslyAllowBrowser: true,
+        });
+
+    return new AgentRunner(llm, s, vaultTools, vaultName, domains, domainMapDir);
   }
 
   private logEvent(sessionId: string, op: WikiOperation, domainId: string | undefined, ev: RunEvent): void {
     let logPath = this.plugin.settings.agentLogPath;
     if (!logPath) return;
     try {
-      // если указана директория — дописываем имя файла
       const stat = existsSync(logPath) ? statSync(logPath) : null;
       if (stat?.isDirectory() || (!logPath.includes(".") && !logPath.endsWith("/"))) {
         logPath = join(logPath, "agent.jsonl");
       }
       const line = JSON.stringify({ ts: new Date().toISOString(), session: sessionId, op, domainId, event: ev }) + "\n";
       appendFileSync(logPath, line, "utf-8");
-    } catch { /* не блокируем операцию если лог недоступен */ }
+    } catch { /* не блокируем операцию */ }
   }
 
   private async dispatch(op: WikiOperation, args: string[], domainId?: string): Promise<void> {
     if (this.isBusy()) {
-      new Notice("Operation in progress, cancel it first");
+      new Notice("Уже выполняется операция, отмените её сначала");
       return;
     }
-    if (this.plugin.settings.backend === "claude-code" && !this.requireSkillPath()) return;
 
-    // iclaudePath нужен только для claude-code backend
-    let iclaudePath: string | null = null;
-    if (this.plugin.settings.backend !== "native-agent") {
-      iclaudePath = this.requireIclaude();
-      if (!iclaudePath) return;
-    }
+    if (this.plugin.settings.backend === "claude-agent" && !this.requireClaudeAgent()) return;
 
     await this.ensureView();
     const view = this.activeView();
     if (!view) return;
+
+    const agentRunner = this.buildAgentRunner();
+    if (!agentRunner) return;
 
     const ctrl = new AbortController();
     this.current = ctrl;
@@ -167,49 +138,18 @@ export class WikiController {
     this.logEvent(sessionId, op, domainId, { kind: "system", message: `start op=${op} args=${JSON.stringify(args)} domainId=${domainId ?? ""}` });
     view.setRunning(op, args);
 
-    const spawnCwd = resolveCwd(this.plugin.settings) ?? undefined;
+    const vaultBasePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+    const vaultName = this.app.vault.getName();
+    const vaultSuffix = `/vaults/${vaultName}`;
+    const repoRoot = vaultBasePath.endsWith(vaultSuffix)
+      ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length)
+      : vaultBasePath;
+
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1000;
-
-    let claudeRunner: IclaudeRunner | null = null;
-    let runGen: AsyncGenerator<RunEvent, void, void>;
-
-    if (this.plugin.settings.backend === "native-agent") {
-      const agentRunner = this.buildAgentRunner();
-      if (!agentRunner) return;
-      const vaultBasePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? spawnCwd ?? "";
-      // domain-map хранит пути вида "vaults/<vault>/!Wiki/X" относительно родительской директории.
-      // Определяем эту родительскую директорию, отрезая суффикс /vaults/<vaultName>.
-      const vaultName = this.app.vault.getName();
-      const vaultSuffix = `/vaults/${vaultName}`;
-      const repoRootForAgent = vaultBasePath.endsWith(vaultSuffix)
-        ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length)
-        : vaultBasePath;
-      runGen = agentRunner.run({ operation: op, args, cwd: repoRootForAgent, signal: ctrl.signal, timeoutMs, domainId });
-    } else {
-      claudeRunner = new IclaudeRunner({
-        iclaudePath: iclaudePath!,
-        allowedTools: this.plugin.settings.allowedTools,
-        model: this.plugin.settings.model,
-      });
-      runGen = claudeRunner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs });
-    }
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
 
     try {
       for await (const ev of runGen) {
-        if (ev.kind === "ask_user") {
-          view.appendEvent(ev);
-          if (claudeRunner) {
-            try {
-              const answer = await view.showQuestionModal(ev.question, ev.options);
-              if (!claudeRunner.sendToolResult(ev.toolUseId, answer)) {
-                ctrl.abort();
-              }
-            } catch {
-              ctrl.abort();
-            }
-          }
-          continue;
-        }
         this.logEvent(sessionId, op, domainId, ev);
         view.appendEvent(ev);
         this.collectStep(ev, steps);
@@ -222,7 +162,7 @@ export class WikiController {
       }
     } catch (err) {
       status = "error";
-      finalText = `Error: ${(err as Error).message}`;
+      finalText = `Ошибка: ${(err as Error).message}`;
       this.logEvent(sessionId, op, domainId, { kind: "error", message: finalText });
     } finally {
       this.current = null;
@@ -249,7 +189,7 @@ export class WikiController {
     if (op === "query-save" && status === "done") {
       const m = finalText.match(/Создана\s+страница:\s*([^\s`'"]+)/i);
       if (m) {
-        const pathInVault = await this.toVaultPath(spawnCwd, m[1]);
+        const pathInVault = await this.toVaultPath(vaultBasePath, m[1]);
         if (pathInVault) await this.app.workspace.openLinkText(pathInVault, "");
       }
     }
@@ -280,9 +220,8 @@ export class WikiController {
     return view instanceof LlmWikiView ? view : null;
   }
 
-  private toVaultPath(spawnCwd: string | undefined, savedPath: string): string | null {
-    const vaultDir = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    const abs = isAbsolute(savedPath) ? savedPath : join(spawnCwd ?? vaultDir, savedPath);
+  private async toVaultPath(vaultDir: string, savedPath: string): Promise<string | null> {
+    const abs = isAbsolute(savedPath) ? savedPath : join(vaultDir, savedPath);
     const rel = relative(vaultDir, abs);
     if (rel.startsWith("..") || isAbsolute(rel)) return null;
     const file = this.app.vault.getAbstractFileByPath(rel);
