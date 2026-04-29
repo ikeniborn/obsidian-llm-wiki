@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   history: [],
   claudeAgent: {
     iclaudePath: "",
-    model: "",
+    model: "sonnet",
     domainMapDir: "",
     systemPrompt: "",
     maxTokens: 4096,
