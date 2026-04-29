@@ -1,5 +1,6 @@
 import { App, Modal, Setting } from "obsidian";
 import type { AddDomainInput, DomainEntry } from "./domain-map";
+import { i18n } from "./i18n";
 
 export class ConfirmModal extends Modal {
   constructor(
@@ -11,14 +12,15 @@ export class ConfirmModal extends Modal {
     super(app);
   }
   onOpen(): void {
+    const T = i18n().modal;
     const { contentEl } = this;
     contentEl.createEl("h3", { text: this.title });
     for (const line of this.lines) {
       contentEl.createEl("p", { text: line });
     }
     new Setting(contentEl)
-      .addButton((b) => b.setButtonText("Отмена").onClick(() => this.close()))
-      .addButton((b) => b.setButtonText("▶ Запустить").setCta().onClick(() => {
+      .addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close()))
+      .addButton((b) => b.setButtonText(`▶ ${T.run}`).setCta().onClick(() => {
         this.close();
         this.onConfirm();
       }));
@@ -32,15 +34,16 @@ export class QueryModal extends Modal {
     super(app);
   }
   onOpen(): void {
+    const T = i18n().modal;
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.save ? "Query + сохранить" : "Query" });
+    contentEl.createEl("h3", { text: this.save ? T.queryAndSave : T.query });
     const ta = contentEl.createEl("textarea", {
       attr: { rows: "5", style: "width:100%;" },
-      placeholder: "Сформулируйте вопрос…",
+      placeholder: T.queryPlaceholder,
     });
     ta.addEventListener("input", () => { this.question = ta.value; });
     new Setting(contentEl).addButton((b) =>
-      b.setButtonText("Запустить").setCta().onClick(() => {
+      b.setButtonText(`▶ ${T.run}`).setCta().onClick(() => {
         const q = this.question.trim();
         if (!q) return;
         this.close();
@@ -64,6 +67,7 @@ export class DomainModal extends Modal {
     super(app);
   }
   onOpen(): void {
+    const T = i18n().modal;
     const { contentEl } = this;
     contentEl.createEl("h3", { text: this.title });
     let domain: string | "all" = this.allowAll ? "all" : (this.domains[0]?.id ?? "");
@@ -71,14 +75,14 @@ export class DomainModal extends Modal {
 
     if (this.domains.length === 0) {
       new Setting(contentEl)
-        .setName("Домен")
-        .setDesc("Домены не найдены. Создайте домен через «Добавить домен».")
-        .addText((t) => t.setPlaceholder("id домена").onChange((v) => { domain = v.trim(); }));
+        .setName(T.domain_name)
+        .setDesc(T.noDomains_desc)
+        .addText((t) => t.setPlaceholder(T.domainIdPlaceholder).onChange((v) => { domain = v.trim(); }));
     } else {
       new Setting(contentEl)
-        .setName("Домен")
+        .setName(T.domain_name)
         .addDropdown((d) => {
-          if (this.allowAll) d.addOption("all", "(вся вики)");
+          if (this.allowAll) d.addOption("all", T.allWiki);
           for (const entry of this.domains) {
             d.addOption(entry.id, entry.name || entry.id);
           }
@@ -89,11 +93,11 @@ export class DomainModal extends Modal {
 
     if (this.extra && "dryRun" in this.extra) {
       new Setting(contentEl)
-        .setName("--dry-run")
+        .setName(T.dryRun_name)
         .addToggle((t) => t.onChange((v) => { dryRun = v; }));
     }
     new Setting(contentEl).addButton((b) =>
-      b.setButtonText("Запустить").setCta().onClick(() => {
+      b.setButtonText(`▶ ${T.run}`).setCta().onClick(() => {
         this.close();
         this.onSubmit(domain, { dryRun });
       }),
@@ -122,14 +126,15 @@ export class AddDomainModal extends Modal {
   }
 
   onOpen(): void {
+    const T = i18n().modal;
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: "Добавить домен" });
+    contentEl.createEl("h3", { text: T.addDomain });
 
     new Setting(contentEl)
-      .setName("ID")
-      .setDesc("Буквы (включая кириллицу), цифры, дефис, подчёркивание. Используется как имя папки.")
+      .setName(T.id_name)
+      .setDesc(T.id_desc)
       .addText((t) =>
-        t.setPlaceholder("например: проекты").onChange((v) => {
+        t.setPlaceholder(T.idPlaceholder).onChange((v) => {
           this.input.id = v.trim();
           if (this.wikiFolderInput && !this.input.wikiFolder) {
             const auto = `${this.wikiRoot}/${this.input.id}`;
@@ -143,14 +148,14 @@ export class AddDomainModal extends Modal {
       );
 
     new Setting(contentEl)
-      .setName("Отображаемое имя")
-      .addText((t) => t.setPlaceholder("Проекты").onChange((v) => { this.input.name = v.trim(); }));
+      .setName(T.displayName_name)
+      .addText((t) => t.setPlaceholder(T.idPlaceholder).onChange((v) => { this.input.name = v.trim(); }));
 
     new Setting(contentEl)
-      .setName("Wiki folder")
-      .setDesc(`Путь относительно cwd. Пусто = ${this.wikiRoot}/<id>.`)
+      .setName(T.wikiFolder_name)
+      .setDesc(T.wikiFolder_desc(this.wikiRoot))
       .addText((t) => {
-        t.setPlaceholder(`${this.wikiRoot}/<id>`).onChange((v) => {
+        t.setPlaceholder(T.wikiFolder_placeholder(this.wikiRoot)).onChange((v) => {
           this.input.wikiFolder = v.trim();
           if (!this.sourcePathsTouched && this.sourcePathsInput) {
             this.sourcePathsInput.setValue(v.trim());
@@ -161,23 +166,20 @@ export class AddDomainModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName("Source paths")
-      .setDesc("Список через запятую. По умолчанию совпадает с wiki folder.")
+      .setName(T.sourcePaths_name)
+      .setDesc(T.sourcePaths_desc)
       .addText((t) => {
-        t.setPlaceholder("vaults/Work/Проекты/").onChange((v) => {
+        t.setPlaceholder(T.sourcePaths_placeholder).onChange((v) => {
           this.sourcePathsTouched = true;
           this.input.sourcePaths = v.split(",").map((s) => s.trim()).filter(Boolean);
         });
         this.sourcePathsInput = t;
       });
 
-    contentEl.createEl("p", {
-      text: "Запись добавится в domain-map-<vault>.json с пустыми entity_types. Для полноценного ingest позже отредактируйте JSON и добавьте entity_types/extraction_cues.",
-      cls: "muted",
-    });
+    contentEl.createEl("p", { text: T.addDomainNote, cls: "muted" });
 
     new Setting(contentEl).addButton((b) =>
-      b.setButtonText("Добавить").setCta().onClick(() => {
+      b.setButtonText(T.add).setCta().onClick(() => {
         if (!this.input.id) return;
         this.close();
         this.onSubmit(this.input);

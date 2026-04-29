@@ -9,6 +9,7 @@ import { AgentRunner } from "./agent-runner";
 import { VaultTools, type VaultAdapter } from "./vault-tools";
 import { ClaudeCliClient } from "./claude-cli-client";
 import OpenAI from "openai";
+import { i18n } from "./i18n";
 
 export class WikiController {
   private current: AbortController | null = null;
@@ -19,13 +20,13 @@ export class WikiController {
   cancelCurrent(): void {
     if (this.current) {
       this.current.abort();
-      new Notice("Отмена…");
+      new Notice(i18n().ctrl.cancelling);
     }
   }
 
   async ingestActive(domainId?: string): Promise<void> {
     const file = this.app.workspace.getActiveFile();
-    if (!file) { new Notice("Нет активного файла"); return; }
+    if (!file) { new Notice(i18n().ctrl.noActiveFile); return; }
     const abs = (this.app.vault.adapter as { getFullPath: (p: string) => string }).getFullPath(file.path);
     await this.dispatch("ingest", [abs], domainId);
   }
@@ -60,15 +61,15 @@ export class WikiController {
   registerDomain(input: AddDomainInput): { ok: true } | { ok: false; error: string } {
     const vaultBase = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), vaultBase, input);
-    if (r.ok) new Notice(`Домен «${input.id}» добавлен`);
-    else new Notice(`Не удалось добавить домен: ${r.error}`);
+    if (r.ok) new Notice(i18n().ctrl.domainAdded(input.id));
+    else new Notice(i18n().ctrl.domainAddFailed(r.error));
     return r;
   }
 
   private requireClaudeAgent(): string | null {
     const p = this.plugin.settings.claudeAgent.iclaudePath;
     if (!p || !existsSync(p)) {
-      new Notice("Укажите путь к Claude Code в настройках");
+      new Notice(i18n().ctrl.setClaudeCodePath);
       return null;
     }
     return p;
@@ -111,7 +112,7 @@ export class WikiController {
 
   private async dispatch(op: WikiOperation, args: string[], domainId?: string): Promise<void> {
     if (this.isBusy()) {
-      new Notice("Уже выполняется операция, отмените её сначала");
+      new Notice(i18n().ctrl.operationRunning);
       return;
     }
 

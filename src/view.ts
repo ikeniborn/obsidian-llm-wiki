@@ -2,6 +2,7 @@ import { App, ItemView, Modal, WorkspaceLeaf, MarkdownRenderer, Component, Notic
 import { AddDomainModal, ConfirmModal } from "./modals";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
+import { i18n } from "./i18n";
 
 export const LLM_WIKI_VIEW_TYPE = "llm-wiki-view";
 
@@ -60,19 +61,20 @@ export class LlmWikiView extends ItemView {
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
     domainRow.createSpan({ cls: "muted", text: "Domain:" });
     this.domainSelect = domainRow.createEl("select", { cls: "llm-wiki-domain-select" });
-    const refreshBtn = domainRow.createEl("button", { text: "↻", attr: { title: "Reload domain-map.json" } });
+    const T = i18n();
+    const refreshBtn = domainRow.createEl("button", { text: "↻", attr: { title: T.view.refreshTitle } });
     refreshBtn.addEventListener("click", () => this.refreshDomains());
-    const addBtn = domainRow.createEl("button", { text: "Add domain" });
+    const addBtn = domainRow.createEl("button", { text: T.view.addDomain });
     addBtn.addEventListener("click", () => this.openAddDomain());
 
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
-    this.ingestBtn = actionRow.createEl("button", { text: "Ingest" });
-    this.lintBtn = actionRow.createEl("button", { text: "Lint" });
-    this.initBtn = actionRow.createEl("button", { text: "Init" });
+    this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
+    this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
+    this.initBtn = actionRow.createEl("button", { text: T.view.init });
 
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
-      if (!file) { new Notice("No active file"); return; }
+      if (!file) { new Notice(i18n().view.noActiveFile); return; }
       const domainId = this.domainSelect.value || undefined;
       new ConfirmModal(this.plugin.app, "Ingest — confirm", [
         `File: ${file.name}`,
@@ -89,7 +91,7 @@ export class LlmWikiView extends ItemView {
     });
     this.initBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
-      if (!d) { new Notice("Select a specific domain for init"); return; }
+      if (!d) { new Notice(i18n().view.selectDomainForInit); return; }
       new ConfirmModal(this.plugin.app, "Init — confirm", [
         `Domain: «${d}»`,
         "Claude will create the folder structure and base wiki pages for the domain.",
@@ -105,9 +107,9 @@ export class LlmWikiView extends ItemView {
       attr: { placeholder: "Question… (Ctrl+Enter — ask, Ctrl+Shift+Enter — ask and save)", rows: "3" },
     });
     const askRow = ask.createDiv("llm-wiki-ask-row");
-    this.askBtn = askRow.createEl("button", { text: "Ask" });
-    this.askSaveBtn = askRow.createEl("button", { text: "Ask and save" });
-    this.cancelBtn = askRow.createEl("button", { text: "Cancel", cls: "mod-warning" });
+    this.askBtn = askRow.createEl("button", { text: T.view.ask });
+    this.askSaveBtn = askRow.createEl("button", { text: T.view.askAndSave });
+    this.cancelBtn = askRow.createEl("button", { text: T.view.cancel, cls: "mod-warning" });
     this.cancelBtn.disabled = true;
 
     this.askBtn.addEventListener("click", () => this.submitQuery(false));
@@ -130,10 +132,10 @@ export class LlmWikiView extends ItemView {
     this.stepsEl = root.createDiv("llm-wiki-steps");
     this.stepsEl.addClass("llm-wiki-hidden");
 
-    root.createEl("h4", { text: "Result" });
+    root.createEl("h4", { text: T.view.result });
     this.finalEl = root.createDiv("llm-wiki-final");
 
-    root.createEl("h4", { text: "History" });
+    root.createEl("h4", { text: T.view.history });
     this.historyEl = root.createDiv("llm-wiki-history");
     this.renderHistory();
   }
@@ -146,7 +148,7 @@ export class LlmWikiView extends ItemView {
     const domains = this.plugin.controller.loadDomains();
     const previous = this.domainSelect.value;
     this.domainSelect.empty();
-    const allOpt = this.domainSelect.createEl("option", { value: "", text: "(all)" });
+    const allOpt = this.domainSelect.createEl("option", { value: "", text: i18n().view.allDomains });
     void allOpt;
     for (const d of domains) {
       this.domainSelect.createEl("option", { value: d.id, text: d.name || d.id });
@@ -158,7 +160,7 @@ export class LlmWikiView extends ItemView {
 
   private openAddDomain(): void {
     const cwd = this.plugin.controller.cwdOrEmpty();
-    if (!cwd) { new Notice("Working directory is not set"); return; }
+    if (!cwd) { new Notice(i18n().view.cwdNotSet); return; }
     // wiki_root возьмём из существующих записей или дефолт vaults/Work/!Wiki
     const domains = this.plugin.controller.loadDomains();
     const wikiRoot = (() => {
@@ -176,8 +178,8 @@ export class LlmWikiView extends ItemView {
 
   private submitQuery(save: boolean): void {
     const q = this.queryInput.value.trim();
-    if (!q) { new Notice("Enter a question"); return; }
-    if (this.state === "running") { new Notice("Operation already in progress"); return; }
+    if (!q) { new Notice(i18n().view.enterQuestion); return; }
+    if (this.state === "running") { new Notice(i18n().view.operationInProgress); return; }
     void this.plugin.controller.query(q, save, this.domainSelect.value || undefined);
     this.queryInput.value = "";
   }
@@ -318,7 +320,7 @@ export class LlmWikiView extends ItemView {
       return;
     }
     const dur = ((Date.now() - this.startTs) / 1000).toFixed(1);
-    this.progressCount.setText(`${this.stepCount} steps · ${dur}s`);
+    this.progressCount.setText(i18n().view.stepsCount(this.stepCount, dur));
   }
 
   private elapsedShort(): string {
@@ -350,7 +352,7 @@ export class LlmWikiView extends ItemView {
       });
     }
     if (items.length === 0) {
-      this.historyEl.createDiv("muted").setText("No history yet.");
+      this.historyEl.createDiv("muted").setText(i18n().view.noHistory);
     }
   }
 
@@ -379,7 +381,7 @@ class WikiQuestionModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h3", { text: "LLM Wiki — answer required" });
+    contentEl.createEl("h3", { text: i18n().view.answerRequired });
     contentEl.createEl("p", { text: this.question });
 
     if (this.options.length > 0) {
@@ -414,7 +416,7 @@ class WikiQuestionModal extends Modal {
     }
 
     const cancelBtn = contentEl.createEl("button", {
-      text: "Cancel",
+      text: i18n().view.cancel,
       cls: "mod-warning",
     });
     cancelBtn.addEventListener("click", () => {
@@ -464,11 +466,12 @@ function truncate(s: string, n: number): string {
 }
 
 function translateSystemEvent(message: string): string {
-  if (message === "hook_started") return "Starting";
-  if (message === "hook_response") return "Initialising";
+  const T = i18n().view;
+  if (message === "hook_started") return T.starting;
+  if (message === "hook_response") return T.initialising;
   if (message.startsWith("init")) {
     const model = message.replace(/^init\s*/, "").replace(/[()]/g, "").trim();
-    return model ? `Initialising (${model})` : "Initialising";
+    return model ? `${T.initialising} (${model})` : T.initialising;
   }
   return message;
 }

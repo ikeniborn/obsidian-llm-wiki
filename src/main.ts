@@ -4,6 +4,7 @@ import { LlmWikiSettingTab } from "./settings";
 import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
 import { WikiController } from "./controller";
 import { QueryModal, DomainModal } from "./modals";
+import { i18n } from "./i18n";
 
 export default class LlmWikiPlugin extends Plugin {
   settings!: LlmWikiPluginSettings;
@@ -25,9 +26,11 @@ export default class LlmWikiPlugin extends Plugin {
       }
     });
 
+    const T = i18n();
+
     this.addCommand({
       id: "open-panel",
-      name: "Open panel",
+      name: T.cmd.openPanel,
       callback: () => {
         const right = this.app.workspace.getRightLeaf(false);
         if (right) void right.setViewState({ type: LLM_WIKI_VIEW_TYPE, active: true });
@@ -36,45 +39,45 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.addCommand({
       id: "ingest-current",
-      name: "Ingest active file",
+      name: T.cmd.ingestActive,
       callback: () => void this.controller.ingestActive(),
     });
 
     this.addCommand({
       id: "query",
-      name: "Query",
+      name: T.cmd.query,
       callback: () => new QueryModal(this.app, false, (q) => void this.controller.query(q, false)).open(),
     });
 
     this.addCommand({
       id: "query-save",
-      name: "Query and save as page",
+      name: T.cmd.querySave,
       callback: () => new QueryModal(this.app, true, (q) => void this.controller.query(q, true)).open(),
     });
 
     this.addCommand({
       id: "lint",
-      name: "Lint domain",
+      name: T.cmd.lint,
       callback: () => {
         const domains = this.controller.loadDomains();
-        new DomainModal(this.app, "Lint", true, null, domains,
+        new DomainModal(this.app, T.cmd.lint, true, null, domains,
           (d) => void this.controller.lint(d)).open();
       },
     });
 
     this.addCommand({
       id: "init",
-      name: "Init domain",
+      name: T.cmd.init,
       callback: () => {
         const domains = this.controller.loadDomains();
-        new DomainModal(this.app, "Init", false, { dryRun: true }, domains,
+        new DomainModal(this.app, T.cmd.init, false, { dryRun: true }, domains,
           (d, f) => void this.controller.init(d, f.dryRun ?? false)).open();
       },
     });
 
     this.addCommand({
       id: "cancel",
-      name: "Cancel operation",
+      name: T.cmd.cancel,
       callback: () => this.controller.cancelCurrent(),
     });
 

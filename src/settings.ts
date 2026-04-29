@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type LlmWikiPlugin from "./main";
 import type { LlmWikiPluginSettings } from "./types";
+import { i18n } from "./i18n";
 
 export class LlmWikiSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: LlmWikiPlugin) {
@@ -11,15 +12,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = this.plugin.settings;
+    const T = i18n();
 
     containerEl.createEl("h2", { text: "LLM Wiki" });
 
-    // ── Общие настройки ────────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: "Общие настройки" });
+    // ── General settings ───────────────────────────────────────────────────
+    containerEl.createEl("h3", { text: T.settings.h3_general });
 
     new Setting(containerEl)
-      .setName("System prompt")
-      .setDesc("Системный промт для всех операций. Используется обоими бэкендами.")
+      .setName(T.settings.systemPrompt_name)
+      .setDesc(T.settings.systemPrompt_desc)
       .addTextArea((t) => {
         t.inputEl.style.minHeight = "96px";
         t.inputEl.style.width = "100%";
@@ -33,8 +35,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Max tokens")
-      .setDesc("Максимум токенов в ответе. Рекомендуется ≥ 4096.")
+      .setName(T.settings.maxTokens_name)
+      .setDesc(T.settings.maxTokens_desc)
       .addText((t) =>
         t
           .setPlaceholder("4096")
@@ -49,11 +51,11 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Папка domain-map")
-      .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/obsidian-llm-wiki/")
+      .setName(T.settings.domainMapDir_name)
+      .setDesc(T.settings.domainMapDir_desc)
       .addText((t) =>
         t
-          .setPlaceholder("(авто)")
+          .setPlaceholder(T.settings.domainMapDir_placeholder)
           .setValue(s.domainMapDir)
           .onChange(async (v) => {
             s.domainMapDir = v.trim();
@@ -62,8 +64,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Таймауты (секунды)")
-      .setDesc("ingest / query / lint / init")
+      .setName(T.settings.timeouts_name)
+      .setDesc(T.settings.timeouts_desc)
       .addText((t) =>
         t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`)
           .onChange(async (v) => {
@@ -76,8 +78,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Лимит истории")
-      .setDesc("Максимум операций в истории боковой панели.")
+      .setName(T.settings.historyLimit_name)
+      .setDesc(T.settings.historyLimit_desc)
       .addText((t) =>
         t.setValue(String(s.historyLimit))
           .onChange(async (v) => {
@@ -87,8 +89,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Лог агента (JSONL)")
-      .setDesc("Абсолютный путь к файлу лога. Пусто — отключено.")
+      .setName(T.settings.agentLog_name)
+      .setDesc(T.settings.agentLog_desc)
       .addText((t) =>
         t
           .setPlaceholder("/tmp/llm-wiki-agent.jsonl")
@@ -96,16 +98,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           .onChange(async (v) => { s.agentLogPath = v.trim(); await this.plugin.saveSettings(); }),
       );
 
-    // ── Настройки бэкенда ──────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: "Настройки бэкенда" });
+    // ── Backend settings ───────────────────────────────────────────────────
+    containerEl.createEl("h3", { text: T.settings.h3_backend });
 
     new Setting(containerEl)
-      .setName("Backend")
-      .setDesc("Выберите бэкенд для выполнения операций.")
+      .setName(T.settings.backend_name)
+      .setDesc(T.settings.backend_desc)
       .addDropdown((d) =>
         d
-          .addOption("claude-agent", "Claude Code Agent")
-          .addOption("native-agent", "Native Agent (OpenAI-compatible)")
+          .addOption("claude-agent", T.settings.claudeCodeAgent)
+          .addOption("native-agent", T.settings.nativeAgent)
           .setValue(s.backend)
           .onChange(async (v) => {
             s.backend = v as LlmWikiPluginSettings["backend"];
@@ -116,8 +118,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
     if (s.backend === "claude-agent") {
       new Setting(containerEl)
-        .setName("Путь к Claude Code")
-        .setDesc("Обязательно. Полный абсолютный путь к iclaude.sh / iclaude / claude.")
+        .setName(T.settings.iclaudePath_name)
+        .setDesc(T.settings.iclaudePath_desc)
         .addText((t) =>
           t
             .setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh")
@@ -129,8 +131,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("Модель")
-        .setDesc("Имя модели: sonnet, opus, claude-sonnet-4-6 и т.п.")
+        .setName(T.settings.model_name)
+        .setDesc(T.settings.model_desc_claude)
         .addText((t) =>
           t
             .setPlaceholder("sonnet")
@@ -140,11 +142,10 @@ export class LlmWikiSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }),
         );
-
     } else {
       new Setting(containerEl)
-        .setName("Base URL")
-        .setDesc("OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1")
+        .setName(T.settings.baseUrl_name)
+        .setDesc(T.settings.baseUrl_desc)
         .addText((t) =>
           t
             .setPlaceholder("http://localhost:11434/v1")
@@ -156,8 +157,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("API Key")
-        .setDesc('Для Ollama введите "ollama". Для OpenAI — ключ sk-...')
+        .setName(T.settings.apiKey_name)
+        .setDesc(T.settings.apiKey_desc)
         .addText((t) =>
           t
             .setPlaceholder("ollama")
@@ -169,8 +170,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("Модель")
-        .setDesc("Имя модели: llama3.2, mistral, gpt-4o и т.п.")
+        .setName(T.settings.model_name)
+        .setDesc(T.settings.model_desc_native)
         .addText((t) =>
           t
             .setPlaceholder("llama3.2")
@@ -182,8 +183,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("Temperature")
-        .setDesc("0.0–1.0.")
+        .setName(T.settings.temperature_name)
+        .setDesc(T.settings.temperature_desc)
         .addText((t) =>
           t
             .setPlaceholder("0.2")
@@ -198,8 +199,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("Top-p")
-        .setDesc("0.0–1.0, или пусто — отключить.")
+        .setName(T.settings.topP_name)
+        .setDesc(T.settings.topP_desc)
         .addText((t) =>
           t
             .setPlaceholder("(отключено)")
@@ -217,8 +218,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("num_ctx (Ollama)")
-        .setDesc("Размер контекста. Пусто — дефолт модели.")
+        .setName(T.settings.numCtx_name)
+        .setDesc(T.settings.numCtx_desc)
         .addText((t) =>
           t
             .setPlaceholder("(дефолт модели)")

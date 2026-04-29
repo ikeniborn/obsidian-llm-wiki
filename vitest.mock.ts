@@ -25,3 +25,5 @@ export class Notice {}
 export class Modal {}
 
 export class ItemView {}
+
+export const moment = { locale: () => "en" };
