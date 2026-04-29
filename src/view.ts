@@ -19,6 +19,9 @@ export class LlmWikiView extends ItemView {
   private resultToggle!: HTMLElement;
   private resultOpen = false;
   private historyEl!: HTMLElement;
+  private historySection!: HTMLElement;
+  private historyToggle!: HTMLElement;
+  private historyOpen = false;
   private statusEl!: HTMLElement;
   private progressToggle!: HTMLElement;
   private progressCount!: HTMLElement;
@@ -144,8 +147,13 @@ export class LlmWikiView extends ItemView {
     resultHeader.addEventListener("click", () => this.toggleResult());
     this.finalEl = this.resultSection.createDiv("llm-wiki-final llm-wiki-hidden");
 
-    root.createEl("h4", { text: T.view.history });
-    this.historyEl = root.createDiv("llm-wiki-history");
+    this.historySection = root.createDiv("llm-wiki-history-section llm-wiki-hidden");
+    const historyHeader = this.historySection.createDiv("llm-wiki-progress-header");
+    const historyH4 = historyHeader.createEl("h4", { cls: "llm-wiki-progress-title" });
+    this.historyToggle = historyH4.createSpan({ cls: "llm-wiki-progress-arrow", text: "▶" });
+    historyH4.appendText(` ${T.view.history}`);
+    historyHeader.addEventListener("click", () => this.toggleHistory());
+    this.historyEl = this.historySection.createDiv("llm-wiki-history llm-wiki-hidden");
     this.renderHistory();
   }
 
@@ -328,6 +336,16 @@ export class LlmWikiView extends ItemView {
     this.renderHistory();
   }
 
+  private toggleHistory(): void {
+    this.historyOpen = !this.historyOpen;
+    if (this.historyOpen) {
+      this.historyEl.removeClass("llm-wiki-hidden");
+    } else {
+      this.historyEl.addClass("llm-wiki-hidden");
+    }
+    this.historyToggle.setText(this.historyOpen ? "▼" : "▶");
+  }
+
   private toggleResult(): void {
     this.resultOpen = !this.resultOpen;
     if (this.resultOpen) {
@@ -374,6 +392,12 @@ export class LlmWikiView extends ItemView {
   private renderHistory(): void {
     this.historyEl.empty();
     const items = this.plugin.settings.history.slice().reverse();
+    if (items.length === 0) {
+      this.historySection.addClass("llm-wiki-hidden");
+      this.historyOpen = false;
+      return;
+    }
+    this.historySection.removeClass("llm-wiki-hidden");
     for (const it of items) {
       const row = this.historyEl.createDiv("llm-wiki-history-row");
       row.createSpan().setText(this.statusLabel(it));
@@ -388,9 +412,6 @@ export class LlmWikiView extends ItemView {
         this.resultOpen = true;
         this.resultToggle.setText("▼");
       });
-    }
-    if (items.length === 0) {
-      this.historyEl.createDiv("muted").setText(i18n().view.noHistory);
     }
   }
 
