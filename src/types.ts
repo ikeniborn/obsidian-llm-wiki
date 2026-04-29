@@ -65,6 +65,7 @@ export type LlmClient = {
 
 export interface LlmWikiPluginSettings {
   backend: "claude-agent" | "native-agent";
+  systemPrompt: string;
   agentLogPath: string;
   historyLimit: number;
   timeouts: {
@@ -78,7 +79,6 @@ export interface LlmWikiPluginSettings {
     iclaudePath: string;
     model: string;
     domainMapDir: string;
-    systemPrompt: string;
     maxTokens: number;
     requestTimeoutSec: number;
   };
@@ -90,7 +90,6 @@ export interface LlmWikiPluginSettings {
     maxTokens: number;
     requestTimeoutSec: number;
     topP: number | null;
-    systemPrompt: string;
     numCtx: number | null;
     domainMapDir: string;
   };
@@ -98,6 +97,7 @@ export interface LlmWikiPluginSettings {
 
 export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   backend: "claude-agent",
+  systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
   agentLogPath: "",
   historyLimit: 20,
   timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
@@ -106,7 +106,6 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
     iclaudePath: "",
     model: "sonnet",
     domainMapDir: "",
-    systemPrompt: "",
     maxTokens: 4096,
     requestTimeoutSec: 300,
   },
@@ -118,7 +117,6 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
     maxTokens: 4096,
     requestTimeoutSec: 300,
     topP: null,
-    systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
     numCtx: null,
     domainMapDir: "",
   },

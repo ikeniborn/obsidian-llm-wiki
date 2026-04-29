@@ -14,6 +14,23 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "LLM Wiki" });
 
+    containerEl.createEl("h3", { text: "Общие настройки" });
+
+    new Setting(containerEl)
+      .setName("System prompt")
+      .setDesc("Системный промт для всех операций. Используется обоими бэкендами.")
+      .addTextArea((t) => {
+        t.inputEl.style.minHeight = "96px";
+        t.inputEl.style.width = "100%";
+        t
+          .setValue(s.systemPrompt)
+          .onChange(async (v) => {
+            s.systemPrompt = v;
+            await this.plugin.saveSettings();
+          });
+        return t;
+      });
+
     new Setting(containerEl)
       .setName("Backend")
       .setDesc("Выберите бэкенд для выполнения операций.")
@@ -28,6 +45,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
             this.display();
           }),
       );
+
+    containerEl.createEl("h3", { text: "Настройки бэкенда" });
 
     if (s.backend === "claude-agent") {
       new Setting(containerEl)
@@ -71,21 +90,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
               }
             }),
         );
-
-      new Setting(containerEl)
-        .setName("System prompt")
-        .setDesc("Добавляется к системному контенту каждой операции.")
-        .addTextArea((t) => {
-          t.inputEl.style.minHeight = "96px";
-          t.inputEl.style.width = "100%";
-          t
-            .setValue(s.claudeAgent.systemPrompt)
-            .onChange(async (v) => {
-              s.claudeAgent.systemPrompt = v;
-              await this.plugin.saveSettings();
-            });
-          return t;
-        });
 
       new Setting(containerEl)
         .setName("Request timeout (сек)")
@@ -240,21 +244,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }),
         );
-
-      new Setting(containerEl)
-        .setName("System prompt")
-        .setDesc("Добавляется к системному контенту каждой операции.")
-        .addTextArea((t) => {
-          t.inputEl.style.minHeight = "96px";
-          t.inputEl.style.width = "100%";
-          t
-            .setValue(s.nativeAgent.systemPrompt)
-            .onChange(async (v) => {
-              s.nativeAgent.systemPrompt = v;
-              await this.plugin.saveSettings();
-            });
-          return t;
-        });
 
       new Setting(containerEl)
         .setName("Папка domain-map")
