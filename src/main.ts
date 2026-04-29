@@ -93,18 +93,43 @@ export default class LlmWikiPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as Record<string, unknown> | null;
+
+    const caData = (data?.claudeAgent as Record<string, unknown>) ?? {};
+    const naData = (data?.nativeAgent as Record<string, unknown>) ?? {};
+    const caOps = (caData.operations as Record<string, unknown>) ?? {};
+    const naOps = (naData.operations as Record<string, unknown>) ?? {};
+
+    const defCA = DEFAULT_SETTINGS.claudeAgent;
+    const defNA = DEFAULT_SETTINGS.nativeAgent;
+
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...(data ?? {}),
       timeouts: { ...DEFAULT_SETTINGS.timeouts, ...((data?.timeouts as object) ?? {}) },
-      nativeAgent: { ...DEFAULT_SETTINGS.nativeAgent, ...((data?.nativeAgent as object) ?? {}) },
-      claudeAgent: { ...DEFAULT_SETTINGS.claudeAgent, ...((data?.claudeAgent as object) ?? {}) },
+      claudeAgent: {
+        ...defCA,
+        ...caData,
+        operations: {
+          ingest: { ...defCA.operations.ingest, ...((caOps.ingest as object) ?? {}) },
+          query:  { ...defCA.operations.query,  ...((caOps.query  as object) ?? {}) },
+          lint:   { ...defCA.operations.lint,   ...((caOps.lint   as object) ?? {}) },
+          init:   { ...defCA.operations.init,   ...((caOps.init   as object) ?? {}) },
+        },
+      },
+      nativeAgent: {
+        ...defNA,
+        ...naData,
+        operations: {
+          ingest: { ...defNA.operations.ingest, ...((naOps.ingest as object) ?? {}) },
+          query:  { ...defNA.operations.query,  ...((naOps.query  as object) ?? {}) },
+          lint:   { ...defNA.operations.lint,   ...((naOps.lint   as object) ?? {}) },
+          init:   { ...defNA.operations.init,   ...((naOps.init   as object) ?? {}) },
+        },
+      },
       history: (data?.history as RunHistoryEntry[]) ?? [],
     } as LlmWikiPluginSettings;
 
     // Миграция: поля, перенесённые с per-backend уровня на top-level (schema v2)
-    const caData = (data?.claudeAgent as Record<string, unknown>) ?? {};
-    const naData = (data?.nativeAgent as Record<string, unknown>) ?? {};
     if (!data?.systemPrompt && (caData.systemPrompt || naData.systemPrompt))
       this.settings.systemPrompt = (caData.systemPrompt ?? naData.systemPrompt) as string;
     if (!data?.domainMapDir && (caData.domainMapDir || naData.domainMapDir))
@@ -115,12 +140,10 @@ export default class LlmWikiPlugin extends Plugin {
     // Миграция с claude-code backend
     if ((data?.backend as string) === "claude-code") {
       this.settings.backend = "claude-agent";
-      if (data.iclaudePath && !this.settings.claudeAgent.iclaudePath) {
+      if (data && data.iclaudePath && !this.settings.claudeAgent.iclaudePath)
         this.settings.claudeAgent.iclaudePath = data.iclaudePath as string;
-      }
-      if (data.model && !this.settings.claudeAgent.model) {
+      if (data && data.model && !this.settings.claudeAgent.model)
         this.settings.claudeAgent.model = data.model as string;
-      }
     }
   }
 
