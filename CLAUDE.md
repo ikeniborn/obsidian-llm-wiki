@@ -86,6 +86,16 @@ esbuild (`esbuild.config.mjs`): entrypoint `src/main.ts` → `main.js` (CJS, ES2
 
 Внешние зависимости (не бандлятся): `obsidian`, `electron`, `node:child_process`, `node:readline`, `node:path`, `node:fs`.
 
+### Версионирование
+
+**Правило:** перед каждой сборкой (`npm run build`) автоматически поднимать patch-версию в `package.json` и `manifest.json`. Minor и major поднимаются только вручную по запросу.
+
+Порядок действий перед сборкой:
+1. Прочитать текущую версию из `package.json` (поле `version`)
+2. Инкрементировать patch: `X.Y.Z` → `X.Y.(Z+1)`
+3. Записать новую версию в `package.json` и `manifest.json` (поле `version`)
+4. Запустить `npm run build`
+
 ## Constraints
 
 - **`buildPrompt()`**: аргументы не должны содержать `\n` или `\` — newline разрывает argv при spawn, backslash ломает shell-экранирование. Функция бросает ошибку при нарушении.

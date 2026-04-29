@@ -1,20 +1,23 @@
 import { isAbsolute, join } from "node:path";
 import type OpenAI from "openai";
 import type { DomainEntry } from "../domain-map";
-import type { RunEvent } from "../types";
+import type { LlmCallOptions, RunEvent, LlmClient } from "../types";
 import type { VaultTools } from "../vault-tools";
+import { buildChatParams, extractStreamDeltas } from "./llm-utils";
 
 const MAX_CONTEXT_CHARS = 80_000;
+const META_FILES = ["_index.md", "_log.md", "_schema.md"];
 
 export async function* runQuery(
   args: string[],
   save: boolean,
   vaultTools: VaultTools,
-  llm: OpenAI,
+  llm: LlmClient,
   model: string,
   domains: DomainEntry[],
   repoRoot: string,
   signal: AbortSignal,
+  opts: LlmCallOptions = {},
 ): AsyncGenerator<RunEvent> {
   const question = args[0]?.trim();
   if (!question) {
@@ -35,9 +38,17 @@ export async function* runQuery(
     return;
   }
 
+  const wikiRoot = wikiVaultPath.split("/").slice(0, -1).join("/");
+
   yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
-  const files = await vaultTools.listFiles(wikiVaultPath);
+  const allFiles = await vaultTools.listFiles(wikiVaultPath);
+  const files = allFiles.filter((f) => !META_FILES.some((m) => f.endsWith(m)));
   yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
+
+  const [indexContent, schemaContent] = await Promise.all([
+    tryRead(vaultTools, `${wikiRoot}/_index.md`),
+    tryRead(vaultTools, `${wikiRoot}/_schema.md`),
+  ]);
 
   const pages = await vaultTools.readAll(files);
 
@@ -51,33 +62,41 @@ export async function* runQuery(
     contextBlock = contextBlock.slice(0, MAX_CONTEXT_CHARS) + "\n[...truncated]";
   }
 
+  const entityTypesBlock = buildEntityTypesBlock(domain);
+  const indexBlock = indexContent ? `\n\nВики-индекс (_index.md):\n${indexContent.slice(0, 3000)}` : "";
+  const schemaBlock = schemaContent ? `\n\nКонвенции (_schema.md):\n${schemaContent.slice(0, 2000)}` : "";
+
+  const systemPrompt = [
+    `Ты — ассистент по wiki-базе знаний домена «${domain.name}».`,
+    `Отвечай строго на основе предоставленных wiki-страниц. Будь точен и лаконичен.`,
+    `Используй WikiLinks [[название]] при ссылках на страницы из индекса.`,
+    entityTypesBlock,
+    schemaBlock,
+    indexBlock,
+  ].filter(Boolean).join("\n\n");
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    {
-      role: "system",
-      content: "You are a wiki query assistant. Answer based only on the provided wiki pages. Be concise and accurate.",
-    },
-    {
-      role: "user",
-      content: `Question: ${question}\n\nWiki pages:\n${contextBlock}`,
-    },
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Вопрос: ${question}\n\nWiki-страницы:\n${contextBlock}` },
   ];
 
+  const params = buildChatParams(model, messages, opts);
   let answer = "";
   try {
     const stream = await llm.chat.completions.create(
-      { model, messages, stream: true },
+      { ...params, stream: true } as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
       { signal },
     );
     for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content ?? "";
-      if (delta) {
-        answer += delta;
-        yield { kind: "assistant_text", delta };
-      }
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning) yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) { answer += content; yield { kind: "assistant_text", delta: content }; }
     }
   } catch (e) {
     if (signal.aborted || (e as Error).name === "AbortError") return;
-    const resp = await llm.chat.completions.create({ model, messages, stream: false });
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+    );
     answer = resp.choices[0]?.message?.content ?? "";
     if (answer) yield { kind: "assistant_text", delta: answer };
   }
@@ -87,7 +106,19 @@ export async function* runQuery(
   if (save && answer) {
     const slug = question.slice(0, 40).replace(/[^a-zA-Z0-9а-яёА-ЯЁ\s]/g, "").trim().replace(/\s+/g, "-");
     const savePath = `${wikiVaultPath}/Q-${slug}.md`;
-    const pageContent = `# ${question}\n\n${answer}\n`;
+    const today = new Date().toISOString().slice(0, 10);
+    const pageContent = [
+      `---`,
+      `wiki_sources: []`,
+      `wiki_updated: ${today}`,
+      `wiki_status: mature`,
+      `tags: []`,
+      `---`,
+      ``,
+      `# ${question}`,
+      ``,
+      answer,
+    ].join("\n");
     yield { kind: "tool_use", name: "Write", input: { path: savePath } };
     try {
       await vaultTools.write(savePath, pageContent);
@@ -100,4 +131,17 @@ export async function* runQuery(
   } else {
     yield { kind: "result", durationMs: Date.now() - start, text: answer };
   }
+}
+
+async function tryRead(vaultTools: VaultTools, path: string): Promise<string> {
+  try { return await vaultTools.read(path); } catch { return ""; }
+}
+
+function buildEntityTypesBlock(domain: DomainEntry): string {
+  if (!domain.entity_types?.length) return "";
+  const types = domain.entity_types
+    .map((et) => `  - ${et.type}: ${et.description}`)
+    .join("\n");
+  const notes = domain.language_notes ? `\nЯзыковые правила: ${domain.language_notes}` : "";
+  return `Типы сущностей домена «${domain.name}»:\n${types}${notes}`;
 }

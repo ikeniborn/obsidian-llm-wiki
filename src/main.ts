@@ -1,5 +1,5 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
-import { DEFAULT_SETTINGS, type LlmWikiPluginSettings } from "./types";
+import { DEFAULT_SETTINGS, type LlmWikiPluginSettings, type RunHistoryEntry } from "./types";
 import { LlmWikiSettingTab } from "./settings";
 import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
 import { WikiController } from "./controller";
@@ -89,15 +89,26 @@ export default class LlmWikiPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const data = (await this.loadData()) as Partial<LlmWikiPluginSettings> | null;
+    const data = (await this.loadData()) as Record<string, unknown> | null;
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...(data ?? {}),
-      timeouts: { ...DEFAULT_SETTINGS.timeouts, ...(data?.timeouts ?? {}) },
-      nativeAgent: { ...DEFAULT_SETTINGS.nativeAgent, ...(data?.nativeAgent ?? {}) },
-      allowedTools: data?.allowedTools ?? DEFAULT_SETTINGS.allowedTools,
-      history: data?.history ?? [],
-    };
+      timeouts: { ...DEFAULT_SETTINGS.timeouts, ...((data?.timeouts as object) ?? {}) },
+      nativeAgent: { ...DEFAULT_SETTINGS.nativeAgent, ...((data?.nativeAgent as object) ?? {}) },
+      claudeAgent: { ...DEFAULT_SETTINGS.claudeAgent, ...((data?.claudeAgent as object) ?? {}) },
+      history: (data?.history as RunHistoryEntry[]) ?? [],
+    } as LlmWikiPluginSettings;
+
+    // Миграция с claude-code backend
+    if ((data?.backend as string) === "claude-code") {
+      this.settings.backend = "claude-agent";
+      if (data.iclaudePath && !this.settings.claudeAgent.iclaudePath) {
+        this.settings.claudeAgent.iclaudePath = data.iclaudePath as string;
+      }
+      if (data.model && !this.settings.claudeAgent.model) {
+        this.settings.claudeAgent.model = data.model as string;
+      }
+    }
   }
 
   async saveSettings(): Promise<void> {

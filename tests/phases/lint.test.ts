@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { runLint } from "../../src/phases/lint";
 import { VaultTools, type VaultAdapter } from "../../src/vault-tools";
-import type OpenAI from "openai";
+import type { LlmClient } from "../../src/types";
 import type { DomainEntry } from "../../src/domain-map";
 
 function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
@@ -15,7 +15,7 @@ function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
   };
 }
 
-function makeLlm(report: string): OpenAI {
+function makeLlm(report: string): LlmClient {
   return {
     chat: {
       completions: {
@@ -26,7 +26,7 @@ function makeLlm(report: string): OpenAI {
         }),
       },
     },
-  } as unknown as OpenAI;
+  } as unknown as LlmClient;
 }
 
 async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {

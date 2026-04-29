@@ -1,17 +1,19 @@
 import { isAbsolute, join } from "node:path";
 import type OpenAI from "openai";
 import type { DomainEntry } from "../domain-map";
-import type { RunEvent } from "../types";
+import type { LlmCallOptions, RunEvent, LlmClient } from "../types";
 import type { VaultTools } from "../vault-tools";
+import { buildChatParams, extractStreamDeltas } from "./llm-utils";
 
 export async function* runIngest(
   args: string[],
   vaultTools: VaultTools,
-  llm: OpenAI,
+  llm: LlmClient,
   model: string,
   domains: DomainEntry[],
   repoRoot: string,
   signal: AbortSignal,
+  opts: LlmCallOptions = {},
 ): AsyncGenerator<RunEvent> {
   const filePath = args[0];
   if (!filePath) {
@@ -49,30 +51,41 @@ export async function* runIngest(
     return;
   }
 
+  const wikiRoot = wikiVaultPath.split("/").slice(0, -1).join("/");
+
+  const [schemaContent, indexContent] = await Promise.all([
+    tryRead(vaultTools, `${wikiRoot}/_schema.md`),
+    tryRead(vaultTools, `${wikiRoot}/_index.md`),
+  ]);
+
   const existingPaths = await vaultTools.listFiles(wikiVaultPath);
-  const existingPages = await vaultTools.readAll(existingPaths);
+  const existingPages = await vaultTools.readAll(existingPaths.filter((f) => !f.endsWith("_index.md")));
 
   yield { kind: "assistant_text", delta: `Synthesizing wiki pages for domain "${domain.id}"...\n` };
 
   const start = Date.now();
-  const messages = buildIngestMessages(sourceVaultPath, sourceContent, domain, wikiVaultPath, existingPages);
+  const messages = buildIngestMessages(
+    sourceVaultPath, sourceContent, domain, wikiVaultPath,
+    existingPages, schemaContent, indexContent,
+  );
+  const params = buildChatParams(model, messages, opts);
 
   let fullText = "";
   try {
     const stream = await llm.chat.completions.create(
-      { model, messages, stream: true },
+      { ...params, stream: true } as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
       { signal },
     );
     for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content ?? "";
-      if (delta) {
-        fullText += delta;
-        yield { kind: "assistant_text", delta };
-      }
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning) yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) { fullText += content; yield { kind: "assistant_text", delta: content }; }
     }
   } catch (e) {
     if (signal.aborted || (e as Error).name === "AbortError") return;
-    const resp = await llm.chat.completions.create({ model, messages, stream: false });
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+    );
     fullText = resp.choices[0]?.message?.content ?? "";
     if (fullText) yield { kind: "assistant_text", delta: fullText };
   }
@@ -80,14 +93,21 @@ export async function* runIngest(
   if (signal.aborted) return;
 
   const pages = parseJsonPages(fullText);
+  const written: string[] = [];
   for (const page of pages) {
     yield { kind: "tool_use", name: "Write", input: { path: page.path } };
     try {
       await vaultTools.write(page.path, page.content);
+      written.push(page.path);
       yield { kind: "tool_result", ok: true };
     } catch (e) {
       yield { kind: "tool_result", ok: false, preview: (e as Error).message };
     }
+  }
+
+  if (written.length > 0) {
+    await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
+    await updateIndex(vaultTools, wikiRoot, written);
   }
 
   yield {
@@ -126,36 +146,104 @@ export function parseJsonPages(text: string): Array<{ path: string; content: str
   }
 }
 
+async function appendLog(
+  vaultTools: VaultTools,
+  wikiRoot: string,
+  sourcePath: string,
+  domainId: string,
+  written: string[],
+): Promise<void> {
+  const logPath = `${wikiRoot}/_log.md`;
+  const today = new Date().toISOString().slice(0, 10);
+  const entry = `\n## ${today} — ingest — ${domainId}\n- Источник: ${sourcePath}\n- Страниц: ${written.map((p) => `\n  - ${p}`).join("")}\n`;
+  try {
+    const existing = await tryRead(vaultTools, logPath);
+    await vaultTools.write(logPath, existing + entry);
+  } catch { /* не критично */ }
+}
+
+async function updateIndex(vaultTools: VaultTools, wikiRoot: string, written: string[]): Promise<void> {
+  const indexPath = `${wikiRoot}/_index.md`;
+  try {
+    const existing = await tryRead(vaultTools, indexPath);
+    const newLinks = written.map((p) => {
+      const name = p.split("/").pop()?.replace(/\.md$/, "") ?? p;
+      return `- [[${name}]]`;
+    }).join("\n");
+    const updated = existing
+      ? existing + "\n" + newLinks
+      : `# Wiki Index\n\n${newLinks}`;
+    await vaultTools.write(indexPath, updated);
+  } catch { /* не критично */ }
+}
+
+async function tryRead(vaultTools: VaultTools, path: string): Promise<string> {
+  try { return await vaultTools.read(path); } catch { return ""; }
+}
+
+function buildEntityTypesBlock(domain: DomainEntry): string {
+  if (!domain.entity_types?.length) return "";
+  return domain.entity_types.map((et) => [
+    `### Тип: ${et.type}`,
+    `Описание: ${et.description}`,
+    `Ключевые слова: ${et.extraction_cues.join(", ")}`,
+    et.min_mentions_for_page != null ? `Мин. упоминаний для страницы: ${et.min_mentions_for_page}` : "",
+    et.wiki_subfolder ? `Подпапка в wiki: ${et.wiki_subfolder}` : "",
+  ].filter(Boolean).join("\n")).join("\n\n");
+}
+
 function buildIngestMessages(
   sourcePath: string,
   sourceContent: string,
   domain: DomainEntry,
   wikiVaultPath: string,
   existingPages: Map<string, string>,
+  schemaContent: string,
+  indexContent: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   const existing = existingPages.size > 0
-    ? [...existingPages.entries()].map(([p, c]) => `${p}:\n${c.slice(0, 300)}`).join("\n\n")
-    : "None yet.";
+    ? [...existingPages.entries()].map(([p, c]) => `${p}:\n${c.slice(0, 400)}`).join("\n\n")
+    : "Нет.";
+
+  const today = new Date().toISOString().slice(0, 10);
+  const entityTypesBlock = buildEntityTypesBlock(domain);
+  const langNotes = domain.language_notes ? `\nЯзыковые правила: ${domain.language_notes}` : "";
+
+  const systemContent = [
+    `Ты — ассистент синтеза wiki-знаний для домена «${domain.name}».`,
+    `Извлекай сущности из источника и создавай/обновляй wiki-страницы.`,
+    ``,
+    `ТИПЫ СУЩНОСТЕЙ ДОМЕНА:`,
+    entityTypesBlock || "(не заданы)",
+    langNotes,
+    ``,
+    `ПРАВИЛА:`,
+    `- CREATE: сущность не существует в wiki, упоминаний >= min_mentions_for_page`,
+    `- UPDATE: сущность существует → добавить новую информацию, НЕ удалять старую`,
+    `- SKIP: слишком мало упоминаний или информация уже есть`,
+    `- Синтез, не копирование. Технические конфиги/SQL можно цитировать в code-блоках.`,
+    `- Путь страницы должен начинаться с "${wikiVaultPath}/"`,
+    `- Frontmatter обязателен: wiki_sources, wiki_updated: ${today}, wiki_status: stub|developing|mature`,
+    schemaContent ? `\nКОНВЕНЦИИ (_schema.md):\n${schemaContent.slice(0, 2000)}` : "",
+    ``,
+    `Верни ТОЛЬКО JSON-массив, без другого текста:`,
+    `[{"path":"${wikiVaultPath}/EntityName.md","content":"---\\nwiki_sources: [${sourcePath}]\\nwiki_updated: ${today}\\nwiki_status: stub\\ntags: []\\n---\\n# EntityName\\n\\ncontент..."}]`,
+  ].filter((s) => s !== null).join("\n");
+
   return [
-    {
-      role: "system",
-      content:
-        `You are a wiki synthesis assistant. Extract key entities from the source and create wiki pages.\n` +
-        `Return ONLY a JSON array, no other text:\n` +
-        `[{"path":"${wikiVaultPath}/EntityName.md","content":"# EntityName\\n\\ncontent..."}]\n` +
-        `Rules: one entity per page; markdown; path must start with "${wikiVaultPath}"; facts from source only.`,
-    },
+    { role: "system", content: systemContent },
     {
       role: "user",
       content: [
-        `Domain: ${domain.id} (${domain.name})`,
-        `Wiki folder (vault-relative): ${wikiVaultPath}`,
-        "",
-        `Source file: ${sourcePath}`,
+        `Домен: ${domain.id} (${domain.name})`,
+        `Wiki-папка: ${wikiVaultPath}`,
+        ``,
+        `Источник: ${sourcePath}`,
         sourceContent.slice(0, 8000),
-        "",
-        `Existing pages:\n${existing}`,
-      ].join("\n"),
+        ``,
+        `Существующие wiki-страницы:\n${existing}`,
+        indexContent ? `\nИндекс wiki (_index.md):\n${indexContent.slice(0, 2000)}` : "",
+      ].filter(Boolean).join("\n"),
     },
   ];
 }

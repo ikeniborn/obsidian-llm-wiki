@@ -63,3 +63,7 @@
 /* WikiQuestionModal */
 .llm-wiki-modal-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .llm-wiki-modal-input { width: 100%; margin-top: 8px; box-sizing: border-box; }
+
+.llm-wiki-hidden {
+  display: none;
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { runIngest } from "../../src/phases/ingest";
 import { VaultTools, type VaultAdapter } from "../../src/vault-tools";
-import type OpenAI from "openai";
+import type { LlmClient } from "../../src/types";
 import type { DomainEntry } from "../../src/domain-map";
 
 function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
@@ -15,7 +15,7 @@ function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
   };
 }
 
-function makeLlm(responseText: string): OpenAI {
+function makeLlm(responseText: string): LlmClient {
   const fakeStream = {
     [Symbol.asyncIterator]: async function* () {
       yield { choices: [{ delta: { content: responseText } }] };
@@ -23,7 +23,7 @@ function makeLlm(responseText: string): OpenAI {
   };
   return {
     chat: { completions: { create: vi.fn().mockResolvedValue(fakeStream) } },
-  } as unknown as OpenAI;
+  } as unknown as LlmClient;
 }
 
 async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { runInit } from "../../src/phases/init";
 import { VaultTools, type VaultAdapter } from "../../src/vault-tools";
-import type OpenAI from "openai";
+import type { LlmClient } from "../../src/types";
 import type { DomainEntry } from "../../src/domain-map";
 
 function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
@@ -15,7 +15,7 @@ function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
   };
 }
 
-function makeLlm(json: string): OpenAI {
+function makeLlm(json: string): LlmClient {
   return {
     chat: {
       completions: {
@@ -26,7 +26,7 @@ function makeLlm(json: string): OpenAI {
         }),
       },
     },
-  } as unknown as OpenAI;
+  } as unknown as LlmClient;
 }
 
 async function collect<T>(gen: AsyncGenerator<T>): Promise<T[]> {
@@ -55,7 +55,7 @@ describe("runInit", () => {
   it("yields error when domainId is empty", async () => {
     const vt = new VaultTools(mockAdapter(), "/vault");
     const events = await collect(
-      runInit([], vt, makeLlm("{}"), "model", [], "/vault", "TestVault", "/skill", new AbortController().signal),
+      runInit([], vt, makeLlm("{}"), "model", [], "/vault", "TestVault", "/domainMapDir", new AbortController().signal),
     );
     expect(events.some((e: any) => e.kind === "error")).toBe(true);
   });
@@ -71,7 +71,7 @@ describe("runInit", () => {
         [existingDomain],
         "/vault",
         "TestVault",
-        "/skill",
+        "/domainMapDir",
         new AbortController().signal,
       ),
     );
@@ -92,7 +92,7 @@ describe("runInit", () => {
         [],
         "/vault",
         "TestVault",
-        "/skill",
+        "/domainMapDir",
         new AbortController().signal,
       ),
     );

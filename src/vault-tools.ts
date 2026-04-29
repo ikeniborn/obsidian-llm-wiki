@@ -28,8 +28,13 @@ export class VaultTools {
   async listFiles(vaultDir: string): Promise<string[]> {
     const exists = await this.adapter.exists(vaultDir);
     if (!exists) return [];
+    return this._listRecursive(vaultDir);
+  }
+
+  private async _listRecursive(vaultDir: string): Promise<string[]> {
     const result = await this.adapter.list(vaultDir);
-    return result.files;
+    const deeper = await Promise.all(result.folders.map((f) => this._listRecursive(f)));
+    return [...result.files, ...deeper.flat()];
   }
 
   async readAll(paths: string[]): Promise<Map<string, string>> {
