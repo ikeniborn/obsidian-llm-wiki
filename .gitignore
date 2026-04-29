@@ -3,3 +3,4 @@ main.js
 *.log
 .vitest-cache/
 !dist/main.js
+/tmp/
