@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { AgentRunner } from "../src/agent-runner";
 import { VaultTools, type VaultAdapter } from "../src/vault-tools";
-import type { RunEvent, LlmWikiPluginSettings } from "../src/types";
-import type OpenAI from "openai";
+import type { RunEvent, LlmWikiPluginSettings, LlmClient } from "../src/types";
+import { DEFAULT_SETTINGS } from "../src/types";
 
 function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
   return {
@@ -15,7 +15,7 @@ function mockAdapter(overrides: Partial<VaultAdapter> = {}): VaultAdapter {
   };
 }
 
-function makeLlm(text: string) {
+function makeLlm(text: string): LlmClient {
   return {
     chat: {
       completions: {
@@ -26,20 +26,12 @@ function makeLlm(text: string) {
         }),
       },
     },
-  };
+  } as unknown as LlmClient;
 }
 
 const baseSettings: LlmWikiPluginSettings = {
-  iclaudePath: "",
-  cwd: "/skill",
-  allowedTools: [],
-  model: "",
-  showRawJson: false,
-  historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
-  history: [],
+  ...DEFAULT_SETTINGS,
   backend: "native-agent",
-  nativeAgent: { baseUrl: "http://localhost:11434/v1", apiKey: "ollama", model: "llama3.2" },
 };
 
 async function collect(gen: AsyncGenerator<RunEvent>): Promise<RunEvent[]> {
@@ -51,8 +43,7 @@ async function collect(gen: AsyncGenerator<RunEvent>): Promise<RunEvent[]> {
 describe("AgentRunner", () => {
   it("yields system init event on start", async () => {
     const vt = new VaultTools(mockAdapter(), "/vault");
-    const runner = new AgentRunner(baseSettings, vt, "TestVault", []);
-    runner._overrideLlm(makeLlm("[]") as any);
+    const runner = new AgentRunner(makeLlm("[]"), baseSettings, vt, "TestVault", []);
     const events = await collect(
       runner.run({
         operation: "query",
@@ -67,8 +58,7 @@ describe("AgentRunner", () => {
 
   it("yields result event for query", async () => {
     const vt = new VaultTools(mockAdapter(), "/vault");
-    const runner = new AgentRunner(baseSettings, vt, "TestVault", []);
-    runner._overrideLlm(makeLlm("The answer.") as any);
+    const runner = new AgentRunner(makeLlm("The answer."), baseSettings, vt, "TestVault", []);
     const events = await collect(
       runner.run({
         operation: "query",
@@ -78,7 +68,6 @@ describe("AgentRunner", () => {
         timeoutMs: 10_000,
       }),
     );
-    // Verify that we have at least a system event and a result or error event
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]).toMatchObject({ kind: "system" });
     expect(events.some((e) => e.kind === "result" || e.kind === "error")).toBe(true);
@@ -86,8 +75,7 @@ describe("AgentRunner", () => {
 
   it("stops early on aborted signal", async () => {
     const vt = new VaultTools(mockAdapter(), "/vault");
-    const runner = new AgentRunner(baseSettings, vt, "TestVault", []);
-    runner._overrideLlm(makeLlm("answer") as any);
+    const runner = new AgentRunner(makeLlm("answer"), baseSettings, vt, "TestVault", []);
     const ctrl = new AbortController();
     ctrl.abort();
     const events = await collect(
@@ -99,7 +87,6 @@ describe("AgentRunner", () => {
         timeoutMs: 10_000,
       }),
     );
-    // Should have system event and then stop (error or result from query)
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]).toMatchObject({ kind: "system" });
   });

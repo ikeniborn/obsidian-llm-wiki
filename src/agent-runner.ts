@@ -1,61 +1,80 @@
-import OpenAI from "openai";
 import type { DomainEntry } from "./domain-map";
 import { runIngest } from "./phases/ingest";
 import { runQuery } from "./phases/query";
 import { runLint } from "./phases/lint";
 import { runInit } from "./phases/init";
-import type { LlmWikiPluginSettings, RunEvent, RunRequest } from "./types";
+import type { LlmCallOptions, LlmClient, LlmWikiPluginSettings, RunEvent, RunRequest } from "./types";
 import type { VaultTools } from "./vault-tools";
 
 export class AgentRunner {
-  private llm: OpenAI;
-
   constructor(
+    private llm: LlmClient,
     private settings: LlmWikiPluginSettings,
     private vaultTools: VaultTools,
     private vaultName: string,
     private domains: DomainEntry[],
-  ) {
-    this.llm = new OpenAI({
-      baseURL: settings.nativeAgent.baseUrl,
-      apiKey: settings.nativeAgent.apiKey,
-    });
-  }
+    private domainMapDir: string = "",
+  ) {}
 
-  _overrideLlm(llm: OpenAI): void {
-    this.llm = llm;
+  private buildOpts(): LlmCallOptions {
+    if (this.settings.backend === "claude-agent") {
+      const ca = this.settings.claudeAgent;
+      return {
+        maxTokens: ca.maxTokens,
+        systemPrompt: ca.systemPrompt || undefined,
+      };
+    }
+    const na = this.settings.nativeAgent;
+    return {
+      temperature: na.temperature,
+      maxTokens: na.maxTokens,
+      topP: na.topP,
+      systemPrompt: na.systemPrompt || undefined,
+      numCtx: na.numCtx,
+    };
   }
 
   async *run(req: RunRequest): AsyncGenerator<RunEvent, void, void> {
-    yield { kind: "system", message: `native-agent / ${this.settings.nativeAgent.model}` };
+    const modelLabel =
+      this.settings.backend === "claude-agent"
+        ? this.settings.claudeAgent.model || "claude"
+        : this.settings.nativeAgent.model;
+    yield { kind: "system", message: `${this.settings.backend} / ${modelLabel}` };
 
     if (req.signal.aborted) return;
 
-    const model = this.settings.nativeAgent.model;
+    const model =
+      this.settings.backend === "claude-agent"
+        ? this.settings.claudeAgent.model
+        : this.settings.nativeAgent.model;
     const repoRoot = req.cwd ?? "";
-    const skillPath = this.settings.cwd;
+    const opts = this.buildOpts();
+
+    const domains = req.domainId
+      ? this.domains.filter((d) => d.id === req.domainId)
+      : this.domains;
 
     switch (req.operation) {
       case "ingest":
-        yield* runIngest(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runIngest(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       case "query":
-        yield* runQuery(req.args, false, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runQuery(req.args, false, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       case "query-save":
-        yield* runQuery(req.args, true, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runQuery(req.args, true, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       case "lint":
-        yield* runLint(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, req.signal);
+        yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       case "init":
-        yield* runInit(req.args, this.vaultTools, this.llm, model, this.domains, repoRoot, this.vaultName, skillPath, req.signal);
+        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, this.domainMapDir, req.signal, opts);
         break;
-      default:
+      default: {
         const start = Date.now();
         yield { kind: "error", message: `Unknown operation: ${req.operation}` };
         yield { kind: "result", durationMs: Date.now() - start, text: "" };
-        return;
+      }
     }
   }
 }
