@@ -176,6 +176,25 @@ Per-operation models [toggle]
 | `src/agent-runner.ts` | `buildOpts()` → `buildOptsFor(op)` |
 | `src/claude-cli-client.ts` | Use `params.model` instead of `this.cfg.model` |
 
+## i18n
+
+`src/i18n.ts` needs new keys for the toggle and per-operation section headings/fields:
+
+```typescript
+perOperation_name: "Per-operation models",
+perOperation_desc: "Configure separate model and parameters for each operation.",
+op_ingest: "Ingest",
+op_query: "Query",
+op_lint: "Lint",
+op_init: "Init",
+opModel_name: "Model",
+opModel_desc: "Model for this operation.",
+opMaxTokens_name: "Max tokens",
+opMaxTokens_desc: "Max tokens for this operation.",
+opTemperature_name: "Temperature",
+opTemperature_desc: "Temperature for this operation (0–2).",
+```
+
 ## Out of Scope
 
 - `topP` and `numCtx` remain global for native-agent (not per-operation)
