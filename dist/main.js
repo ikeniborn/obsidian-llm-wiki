@@ -28,7 +28,7 @@ __export(domain_map_exports, {
   readDomains: () => readDomains
 });
 function domainMapPath(dir, vaultName) {
-  return (0, import_node_path2.join)(dir, `domain-map-${vaultName}.json`);
+  return (0, import_node_path.join)(dir, `domain-map-${vaultName}.json`);
 }
 function readDomains(dir, vaultName) {
   const p = domainMapPath(dir, vaultName);
@@ -91,18 +91,18 @@ function addDomain(dir, vaultName, repoRoot, input) {
   }
   if (repoRoot) {
     try {
-      (0, import_node_fs.mkdirSync)((0, import_node_path2.join)(repoRoot, wikiFolderRel), { recursive: true });
+      (0, import_node_fs.mkdirSync)((0, import_node_path.join)(repoRoot, wikiFolderRel), { recursive: true });
     } catch {
     }
   }
   return { ok: true };
 }
-var import_node_fs, import_node_path2;
+var import_node_fs, import_node_path;
 var init_domain_map = __esm({
   "src/domain-map.ts"() {
     "use strict";
     import_node_fs = require("node:fs");
-    import_node_path2 = require("node:path");
+    import_node_path = require("node:path");
   }
 });
 
@@ -115,23 +115,20 @@ module.exports = __toCommonJS(main_exports);
 var import_obsidian5 = require("obsidian");
 
 // src/types.ts
-var MODEL_PRESETS = [
-  { value: "", label: "(\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E)" },
-  { value: "opus", label: "opus (Opus 4.7)" },
-  { value: "sonnet", label: "sonnet (Sonnet 4.6)" },
-  { value: "haiku", label: "haiku (Haiku 4.5)" }
-];
 var DEFAULT_SETTINGS = {
-  iclaudePath: "",
-  cwd: "",
-  allowedTools: ["Read", "Edit", "Write", "Glob", "Grep"],
-  model: "",
-  showRawJson: false,
+  backend: "claude-agent",
+  agentLogPath: "",
   historyLimit: 20,
   timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
   history: [],
-  backend: "claude-code",
-  agentLogPath: "",
+  claudeAgent: {
+    iclaudePath: "",
+    model: "",
+    domainMapDir: "",
+    systemPrompt: "",
+    maxTokens: 4096,
+    requestTimeoutSec: 300
+  },
   nativeAgent: {
     baseUrl: "http://localhost:11434/v1",
     apiKey: "ollama",
@@ -148,7 +145,6 @@ var DEFAULT_SETTINGS = {
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
-var import_node_path = require("node:path");
 var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
@@ -158,71 +154,60 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     const s = this.plugin.settings;
-    new import_obsidian.Setting(containerEl).setName("LLM Wiki").setHeading();
-    new import_obsidian.Setting(containerEl).setName("Backend").setDesc("Choose the backend for running operations.").addDropdown(
-      (d) => d.addOption("claude-code", "Claude Code").addOption("native-agent", "Native Agent (OpenAI-compatible)").setValue(s.backend).onChange(async (v) => {
+    containerEl.createEl("h2", { text: "LLM Wiki" });
+    new import_obsidian.Setting(containerEl).setName("Backend").setDesc("\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0431\u044D\u043A\u0435\u043D\u0434 \u0434\u043B\u044F \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439.").addDropdown(
+      (d) => d.addOption("claude-agent", "Claude Agent (claude / iclaude.sh)").addOption("native-agent", "Native Agent (OpenAI-compatible)").setValue(s.backend).onChange(async (v) => {
         s.backend = v;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    if (s.backend === "claude-code") {
-      new import_obsidian.Setting(containerEl).setName("Claude Code path").setDesc("Required. Absolute path to iclaude.sh / iclaude / claude.").addText(
-        (t) => t.setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh").setValue(s.iclaudePath).onChange(async (v) => {
-          s.iclaudePath = v.trim();
+    if (s.backend === "claude-agent") {
+      new import_obsidian.Setting(containerEl).setName("\u041F\u0443\u0442\u044C \u043A Claude Code").setDesc("\u041E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E. \u041F\u043E\u043B\u043D\u044B\u0439 \u0430\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A iclaude.sh / iclaude / claude.").addText(
+        (t) => t.setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh").setValue(s.claudeAgent.iclaudePath).onChange(async (v) => {
+          s.claudeAgent.iclaudePath = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("LLM Wiki skill path").setDesc("Required. Absolute path to the skill folder (contains shared/domain-map.json).").addText(
-        (t) => t.setPlaceholder("/home/user/Documents/Project/iclaude/.nvm-isolated/.claude-isolated/skills/llm-wiki").setValue(s.cwd).onChange(async (v) => {
-          s.cwd = v.trim();
+      new import_obsidian.Setting(containerEl).setName("\u041C\u043E\u0434\u0435\u043B\u044C").setDesc("\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438: sonnet, opus, claude-sonnet-4-6 \u0438 \u0442.\u043F. \u041F\u0443\u0441\u0442\u043E \u2014 \u0434\u0435\u0444\u043E\u043B\u0442 claude.").addText(
+        (t) => t.setPlaceholder("sonnet").setValue(s.claudeAgent.model).onChange(async (v) => {
+          s.claudeAgent.model = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Allowed tools").setDesc("Comma-separated list. Default: Read,Edit,Write,Glob,Grep").addText(
-        (t) => t.setValue(s.allowedTools.join(",")).onChange(async (v) => {
-          s.allowedTools = v.split(",").map((x) => x.trim()).filter(Boolean);
-          await this.plugin.saveSettings();
+      new import_obsidian.Setting(containerEl).setName("Max tokens").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u0432 \u0432 \u043E\u0442\u0432\u0435\u0442\u0435. \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F \u2265 4096.").addText(
+        (t) => t.setPlaceholder("4096").setValue(String(s.claudeAgent.maxTokens)).onChange(async (v) => {
+          const n = Number(v);
+          if (Number.isFinite(n) && n > 0) {
+            s.claudeAgent.maxTokens = Math.floor(n);
+            await this.plugin.saveSettings();
+          }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Model").setDesc("Passed to claude as --model. Use a preset or enter a custom ID (e.g. claude-opus-4-7).").addDropdown((d) => {
-        for (const p of MODEL_PRESETS)
-          d.addOption(p.value, p.label);
-        if (s.model && !MODEL_PRESETS.some((p) => p.value === s.model)) {
-          d.addOption(s.model, s.model);
-        }
-        d.setValue(s.model);
-        d.onChange(async (v) => {
-          s.model = v;
+      new import_obsidian.Setting(containerEl).setName("System prompt").setDesc("\u0414\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u043A \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0443 \u043A\u0430\u0436\u0434\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.").addTextArea((t) => {
+        t.inputEl.style.minHeight = "96px";
+        t.inputEl.style.width = "100%";
+        t.setValue(s.claudeAgent.systemPrompt).onChange(async (v) => {
+          s.claudeAgent.systemPrompt = v;
           await this.plugin.saveSettings();
         });
-      }).addText(
-        (t) => t.setPlaceholder("custom: claude-opus-4-7").setValue(MODEL_PRESETS.some((p) => p.value === s.model) ? "" : s.model).onChange(async (v) => {
-          const trimmed = v.trim();
-          if (trimmed) {
-            s.model = trimmed;
+        return t;
+      });
+      new import_obsidian.Setting(containerEl).setName("Request timeout (\u0441\u0435\u043A)").setDesc("\u0422\u0430\u0439\u043C\u0430\u0443\u0442 subprocess. \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F 300+.").addText(
+        (t) => t.setPlaceholder("300").setValue(String(s.claudeAgent.requestTimeoutSec)).onChange(async (v) => {
+          const n = Number(v);
+          if (Number.isFinite(n) && n > 0) {
+            s.claudeAgent.requestTimeoutSec = Math.floor(n);
             await this.plugin.saveSettings();
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Timeouts (seconds)").setDesc("ingest / query / lint / init").addText(
-        (t) => t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`).onChange(async (v) => {
-          const parts = v.split("/").map((x) => Number(x.trim()));
-          if (parts.length === 4 && parts.every((n) => Number.isFinite(n) && n > 0)) {
-            s.timeouts = { ingest: parts[0], query: parts[1], lint: parts[2], init: parts[3] };
-            await this.plugin.saveSettings();
-          }
-        })
-      );
-      new import_obsidian.Setting(containerEl).setName("Show raw JSON in panel").addToggle(
-        (t) => t.setValue(s.showRawJson).onChange(async (v) => {
-          s.showRawJson = v;
+      new import_obsidian.Setting(containerEl).setName("\u041F\u0430\u043F\u043A\u0430 domain-map").setDesc("\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/.obsidian/plugins/llm-wiki/").addText(
+        (t) => t.setPlaceholder("(\u0430\u0432\u0442\u043E)").setValue(s.claudeAgent.domainMapDir).onChange(async (v) => {
+          s.claudeAgent.domainMapDir = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      if (import_obsidian.Platform.isMobile) {
-        containerEl.createEl("p", { text: "\u26A0 Mobile is not supported (no child_process)." });
-      }
     } else {
       new import_obsidian.Setting(containerEl).setName("Base URL").setDesc("OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1").addText(
         (t) => t.setPlaceholder("http://localhost:11434/v1").setValue(s.nativeAgent.baseUrl).onChange(async (v) => {
@@ -230,19 +215,19 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("API Key").setDesc('For Ollama enter "ollama". For OpenAI \u2014 key sk-...').addText(
+      new import_obsidian.Setting(containerEl).setName("API Key").setDesc('\u0414\u043B\u044F Ollama \u0432\u0432\u0435\u0434\u0438\u0442\u0435 "ollama". \u0414\u043B\u044F OpenAI \u2014 \u043A\u043B\u044E\u0447 sk-...').addText(
         (t) => t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
           s.nativeAgent.apiKey = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Model").setDesc("Model name: llama3.2, mistral, gpt-4o, etc.").addText(
+      new import_obsidian.Setting(containerEl).setName("\u041C\u043E\u0434\u0435\u043B\u044C").setDesc("\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438: llama3.2, mistral, gpt-4o \u0438 \u0442.\u043F.").addText(
         (t) => t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
           s.nativeAgent.model = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Temperature").setDesc("0.0\u20131.0. Low (0.1\u20130.3) \u2014 factual, high \u2014 creative.").addText(
+      new import_obsidian.Setting(containerEl).setName("Temperature").setDesc("0.0\u20131.0.").addText(
         (t) => t.setPlaceholder("0.2").setValue(String(s.nativeAgent.temperature)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n >= 0 && n <= 2) {
@@ -251,7 +236,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Max tokens").setDesc("Max tokens in response. For wiki pages \u2265 4096 recommended.").addText(
+      new import_obsidian.Setting(containerEl).setName("Max tokens").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u0432 \u0432 \u043E\u0442\u0432\u0435\u0442\u0435.").addText(
         (t) => t.setPlaceholder("4096").setValue(String(s.nativeAgent.maxTokens)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n > 0) {
@@ -260,7 +245,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Top-p").setDesc("0.0\u20131.0, or empty to disable. Alternative to temperature (nucleus sampling).").addText(
+      new import_obsidian.Setting(containerEl).setName("Top-p").setDesc("0.0\u20131.0, \u0438\u043B\u0438 \u043F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C.").addText(
         (t) => t.setPlaceholder("(\u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E)").setValue(s.nativeAgent.topP != null ? String(s.nativeAgent.topP) : "").onChange(async (v) => {
           const trimmed = v.trim();
           if (!trimmed) {
@@ -273,7 +258,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("Request timeout (s)").setDesc("HTTP request timeout for the LLM. For Ollama on large models 300+ recommended.").addText(
+      new import_obsidian.Setting(containerEl).setName("Request timeout (\u0441\u0435\u043A)").setDesc("\u0422\u0430\u0439\u043C\u0430\u0443\u0442 HTTP-\u0437\u0430\u043F\u0440\u043E\u0441\u0430 \u043A LLM.").addText(
         (t) => t.setPlaceholder("300").setValue(String(s.nativeAgent.requestTimeoutSec)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n > 0) {
@@ -282,7 +267,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           }
         })
       );
-      new import_obsidian.Setting(containerEl).setName("num_ctx (Ollama)").setDesc("Model context size. Ollama only. Empty \u2014 use model default.").addText(
+      new import_obsidian.Setting(containerEl).setName("num_ctx (Ollama)").setDesc("\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0430. \u041F\u0443\u0441\u0442\u043E \u2014 \u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438.").addText(
         (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
           const trimmed = v.trim();
           if (!trimmed) {
@@ -295,7 +280,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian.Setting(containerEl).setName("System prompt").setDesc("Prepended to the system prompt for every operation. Overrides the default when set.").addTextArea((t) => {
+      new import_obsidian.Setting(containerEl).setName("System prompt").setDesc("\u0414\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u043A \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0443 \u043A\u0430\u0436\u0434\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.").addTextArea((t) => {
         t.inputEl.style.minHeight = "96px";
         t.inputEl.style.width = "100%";
         t.setValue(s.nativeAgent.systemPrompt).onChange(async (v) => {
@@ -304,14 +289,23 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
         });
         return t;
       });
-      new import_obsidian.Setting(containerEl).setName("Domain map folder").setDesc("Where to store domain-map-<vault>.json. Empty \u2014 auto: <vault>/.obsidian/plugins/llm-wiki/").addText(
+      new import_obsidian.Setting(containerEl).setName("\u041F\u0430\u043F\u043A\u0430 domain-map").setDesc("\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/.obsidian/plugins/llm-wiki/").addText(
         (t) => t.setPlaceholder("(\u0430\u0432\u0442\u043E)").setValue(s.nativeAgent.domainMapDir).onChange(async (v) => {
           s.nativeAgent.domainMapDir = v.trim();
           await this.plugin.saveSettings();
         })
       );
     }
-    new import_obsidian.Setting(containerEl).setName("History limit").setDesc("Maximum operations kept in sidebar history.").addText(
+    new import_obsidian.Setting(containerEl).setName("\u0422\u0430\u0439\u043C\u0430\u0443\u0442\u044B (\u0441\u0435\u043A\u0443\u043D\u0434\u044B)").setDesc("ingest / query / lint / init").addText(
+      (t) => t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`).onChange(async (v) => {
+        const parts = v.split("/").map((x) => Number(x.trim()));
+        if (parts.length === 4 && parts.every((n) => Number.isFinite(n) && n > 0)) {
+          s.timeouts = { ingest: parts[0], query: parts[1], lint: parts[2], init: parts[3] };
+          await this.plugin.saveSettings();
+        }
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("\u041B\u0438\u043C\u0438\u0442 \u0438\u0441\u0442\u043E\u0440\u0438\u0438").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439 \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u0431\u043E\u043A\u043E\u0432\u043E\u0439 \u043F\u0430\u043D\u0435\u043B\u0438.").addText(
       (t) => t.setValue(String(s.historyLimit)).onChange(async (v) => {
         const n = Number(v);
         if (Number.isFinite(n) && n > 0) {
@@ -320,7 +314,7 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
         }
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Agent log (JSONL)").setDesc("Absolute path to the log file. Each RunEvent written as one JSON line. Empty \u2014 logging disabled.").addText(
+    new import_obsidian.Setting(containerEl).setName("\u041B\u043E\u0433 \u0430\u0433\u0435\u043D\u0442\u0430 (JSONL)").setDesc("\u0410\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A \u0444\u0430\u0439\u043B\u0443 \u043B\u043E\u0433\u0430. \u041F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E.").addText(
       (t) => t.setPlaceholder("/tmp/llm-wiki-agent.jsonl").setValue(s.agentLogPath).onChange(async (v) => {
         s.agentLogPath = v.trim();
         await this.plugin.saveSettings();
@@ -328,14 +322,6 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
     );
   }
 };
-function resolveSkillPath(settings) {
-  return settings.cwd || null;
-}
-function resolveCwd(settings) {
-  if (!settings.cwd)
-    return null;
-  return (0, import_node_path.resolve)(settings.cwd, "../../..");
-}
 
 // src/view.ts
 var import_obsidian3 = require("obsidian");
@@ -856,18 +842,18 @@ var LlmWikiView = class extends import_obsidian3.ItemView {
     }
   }
   showQuestionModal(question, options) {
-    return new Promise((resolve2, reject) => {
-      const modal = new WikiQuestionModal(this.app, question, options, resolve2, reject);
+    return new Promise((resolve, reject) => {
+      const modal = new WikiQuestionModal(this.app, question, options, resolve, reject);
       modal.open();
     });
   }
 };
 var WikiQuestionModal = class extends import_obsidian3.Modal {
-  constructor(app, question, options, resolve2, reject) {
+  constructor(app, question, options, resolve, reject) {
     super(app);
     this.question = question;
     this.options = options;
-    this.resolve = resolve2;
+    this.resolve = resolve;
     this.reject = reject;
   }
   settled = false;
@@ -973,9 +959,791 @@ function translateSystemEvent(message) {
 // src/controller.ts
 var import_obsidian4 = require("obsidian");
 var import_node_fs2 = require("node:fs");
-var import_node_path6 = require("node:path");
+var import_node_path5 = require("node:path");
+init_domain_map();
 
-// src/runner.ts
+// src/phases/ingest.ts
+var import_node_path2 = require("node:path");
+
+// src/phases/llm-utils.ts
+function extractStreamDeltas(chunk) {
+  const delta = chunk.choices[0]?.delta;
+  const rawReasoning = delta?.reasoning;
+  return {
+    reasoning: typeof rawReasoning === "string" ? rawReasoning : "",
+    content: typeof delta?.content === "string" ? delta.content : ""
+  };
+}
+function buildChatParams(model, messages, opts) {
+  const msgs = opts.systemPrompt ? injectSystemPrompt(messages, opts.systemPrompt) : messages;
+  const params = { model, messages: msgs };
+  if (opts.temperature !== void 0)
+    params.temperature = opts.temperature;
+  if (opts.maxTokens != null)
+    params.max_tokens = opts.maxTokens;
+  if (opts.topP != null)
+    params.top_p = opts.topP;
+  if (opts.numCtx != null)
+    params.num_ctx = opts.numCtx;
+  return params;
+}
+function injectSystemPrompt(messages, systemPrompt) {
+  const firstSystem = messages.findIndex((m) => m.role === "system");
+  if (firstSystem >= 0) {
+    const updated = [...messages];
+    const existing = typeof updated[firstSystem].content === "string" ? updated[firstSystem].content : "";
+    updated[firstSystem] = { role: "system", content: `${systemPrompt}
+
+${existing}` };
+    return updated;
+  }
+  return [{ role: "system", content: systemPrompt }, ...messages];
+}
+
+// src/phases/ingest.ts
+async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
+  const filePath = args[0];
+  if (!filePath) {
+    yield { kind: "error", message: "ingest: file path required" };
+    return;
+  }
+  const absSource = (0, import_node_path2.isAbsolute)(filePath) ? filePath : (0, import_node_path2.join)(repoRoot, filePath);
+  const sourceVaultPath = vaultTools.toVaultPath(absSource);
+  if (!sourceVaultPath) {
+    yield { kind: "error", message: `Source file ${filePath} is outside the vault.` };
+    return;
+  }
+  yield { kind: "tool_use", name: "Read", input: { path: sourceVaultPath } };
+  let sourceContent;
+  try {
+    sourceContent = await vaultTools.read(sourceVaultPath);
+  } catch (e) {
+    yield { kind: "error", message: `Cannot read ${sourceVaultPath}: ${e.message}` };
+    return;
+  }
+  yield { kind: "tool_result", ok: true, preview: sourceContent.slice(0, 100) };
+  const domain = detectDomain(absSource, domains, repoRoot);
+  if (!domain) {
+    yield { kind: "error", message: "No domain found for this file. Configure domain-map." };
+    return;
+  }
+  const absWiki = (0, import_node_path2.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path2.join)(repoRoot, domain.wiki_folder);
+  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
+  if (!wikiVaultPath) {
+    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
+    return;
+  }
+  const wikiRoot = wikiVaultPath.split("/").slice(0, -1).join("/");
+  const [schemaContent, indexContent] = await Promise.all([
+    tryRead(vaultTools, `${wikiRoot}/_schema.md`),
+    tryRead(vaultTools, `${wikiRoot}/_index.md`)
+  ]);
+  const existingPaths = await vaultTools.listFiles(wikiVaultPath);
+  const existingPages = await vaultTools.readAll(existingPaths.filter((f) => !f.endsWith("_index.md")));
+  yield { kind: "assistant_text", delta: `Synthesizing wiki pages for domain "${domain.id}"...
+` };
+  const start = Date.now();
+  const messages = buildIngestMessages(
+    sourceVaultPath,
+    sourceContent,
+    domain,
+    wikiVaultPath,
+    existingPages,
+    schemaContent,
+    indexContent
+  );
+  const params = buildChatParams(model, messages, opts);
+  let fullText = "";
+  try {
+    const stream = await llm.chat.completions.create(
+      { ...params, stream: true },
+      { signal }
+    );
+    for await (const chunk of stream) {
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning)
+        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) {
+        fullText += content;
+        yield { kind: "assistant_text", delta: content };
+      }
+    }
+  } catch (e) {
+    if (signal.aborted || e.name === "AbortError")
+      return;
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false }
+    );
+    fullText = resp.choices[0]?.message?.content ?? "";
+    if (fullText)
+      yield { kind: "assistant_text", delta: fullText };
+  }
+  if (signal.aborted)
+    return;
+  const pages = parseJsonPages(fullText);
+  const written = [];
+  for (const page of pages) {
+    yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+    try {
+      await vaultTools.write(page.path, page.content);
+      written.push(page.path);
+      yield { kind: "tool_result", ok: true };
+    } catch (e) {
+      yield { kind: "tool_result", ok: false, preview: e.message };
+    }
+  }
+  if (written.length > 0) {
+    await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
+    await updateIndex(vaultTools, wikiRoot, written);
+  }
+  yield {
+    kind: "result",
+    durationMs: Date.now() - start,
+    text: pages.length > 0 ? `Ingested into ${pages.length} wiki page(s).` : "Ingested into 0 wiki page(s)."
+  };
+}
+function detectDomain(absFilePath, domains, repoRoot) {
+  for (const d of domains) {
+    const matched = d.source_paths?.some((sp) => {
+      const abs = (0, import_node_path2.isAbsolute)(sp) ? sp : (0, import_node_path2.join)(repoRoot, sp);
+      return absFilePath.startsWith(abs);
+    });
+    if (matched)
+      return d;
+  }
+  return domains[0] ?? null;
+}
+function parseJsonPages(text) {
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match)
+    return [];
+  try {
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr))
+      return [];
+    return arr.filter(
+      (x) => x !== null && typeof x === "object" && typeof x.path === "string" && typeof x.content === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+async function appendLog(vaultTools, wikiRoot, sourcePath, domainId, written) {
+  const logPath = `${wikiRoot}/_log.md`;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const entry = `
+## ${today} \u2014 ingest \u2014 ${domainId}
+- \u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ${sourcePath}
+- \u0421\u0442\u0440\u0430\u043D\u0438\u0446: ${written.map((p) => `
+  - ${p}`).join("")}
+`;
+  try {
+    const existing = await tryRead(vaultTools, logPath);
+    await vaultTools.write(logPath, existing + entry);
+  } catch {
+  }
+}
+async function updateIndex(vaultTools, wikiRoot, written) {
+  const indexPath = `${wikiRoot}/_index.md`;
+  try {
+    const existing = await tryRead(vaultTools, indexPath);
+    const newLinks = written.map((p) => {
+      const name = p.split("/").pop()?.replace(/\.md$/, "") ?? p;
+      return `- [[${name}]]`;
+    }).join("\n");
+    const updated = existing ? existing + "\n" + newLinks : `# Wiki Index
+
+${newLinks}`;
+    await vaultTools.write(indexPath, updated);
+  } catch {
+  }
+}
+async function tryRead(vaultTools, path2) {
+  try {
+    return await vaultTools.read(path2);
+  } catch {
+    return "";
+  }
+}
+function buildEntityTypesBlock(domain) {
+  if (!domain.entity_types?.length)
+    return "";
+  return domain.entity_types.map((et) => [
+    `### \u0422\u0438\u043F: ${et.type}`,
+    `\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435: ${et.description}`,
+    `\u041A\u043B\u044E\u0447\u0435\u0432\u044B\u0435 \u0441\u043B\u043E\u0432\u0430: ${et.extraction_cues.join(", ")}`,
+    et.min_mentions_for_page != null ? `\u041C\u0438\u043D. \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439 \u0434\u043B\u044F \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B: ${et.min_mentions_for_page}` : "",
+    et.wiki_subfolder ? `\u041F\u043E\u0434\u043F\u0430\u043F\u043A\u0430 \u0432 wiki: ${et.wiki_subfolder}` : ""
+  ].filter(Boolean).join("\n")).join("\n\n");
+}
+function buildIngestMessages(sourcePath, sourceContent, domain, wikiVaultPath, existingPages, schemaContent, indexContent) {
+  const existing = existingPages.size > 0 ? [...existingPages.entries()].map(([p, c]) => `${p}:
+${c.slice(0, 400)}`).join("\n\n") : "\u041D\u0435\u0442.";
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const entityTypesBlock = buildEntityTypesBlock(domain);
+  const langNotes = domain.language_notes ? `
+\u042F\u0437\u044B\u043A\u043E\u0432\u044B\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u0430: ${domain.language_notes}` : "";
+  const systemContent = [
+    `\u0422\u044B \u2014 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442 \u0441\u0438\u043D\u0442\u0435\u0437\u0430 wiki-\u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043B\u044F \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
+    `\u0418\u0437\u0432\u043B\u0435\u043A\u0430\u0439 \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0438 \u0438\u0437 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0430 \u0438 \u0441\u043E\u0437\u0434\u0430\u0432\u0430\u0439/\u043E\u0431\u043D\u043E\u0432\u043B\u044F\u0439 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.`,
+    ``,
+    `\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419 \u0414\u041E\u041C\u0415\u041D\u0410:`,
+    entityTypesBlock || "(\u043D\u0435 \u0437\u0430\u0434\u0430\u043D\u044B)",
+    langNotes,
+    ``,
+    `\u041F\u0420\u0410\u0412\u0418\u041B\u0410:`,
+    `- CREATE: \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u044C \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0432 wiki, \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439 >= min_mentions_for_page`,
+    `- UPDATE: \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u044C \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u2192 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043D\u043E\u0432\u0443\u044E \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044E, \u041D\u0415 \u0443\u0434\u0430\u043B\u044F\u0442\u044C \u0441\u0442\u0430\u0440\u0443\u044E`,
+    `- SKIP: \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u0430\u043B\u043E \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439 \u0438\u043B\u0438 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F \u0443\u0436\u0435 \u0435\u0441\u0442\u044C`,
+    `- \u0421\u0438\u043D\u0442\u0435\u0437, \u043D\u0435 \u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435. \u0422\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u0438\u0435 \u043A\u043E\u043D\u0444\u0438\u0433\u0438/SQL \u043C\u043E\u0436\u043D\u043E \u0446\u0438\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0432 code-\u0431\u043B\u043E\u043A\u0430\u0445.`,
+    `- \u041F\u0443\u0442\u044C \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0434\u043E\u043B\u0436\u0435\u043D \u043D\u0430\u0447\u0438\u043D\u0430\u0442\u044C\u0441\u044F \u0441 "${wikiVaultPath}/"`,
+    `- Frontmatter \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D: wiki_sources, wiki_updated: ${today}, wiki_status: stub|developing|mature`,
+    schemaContent ? `
+\u041A\u041E\u041D\u0412\u0415\u041D\u0426\u0418\u0418 (_schema.md):
+${schemaContent.slice(0, 2e3)}` : "",
+    ``,
+    `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E JSON-\u043C\u0430\u0441\u0441\u0438\u0432, \u0431\u0435\u0437 \u0434\u0440\u0443\u0433\u043E\u0433\u043E \u0442\u0435\u043A\u0441\u0442\u0430:`,
+    `[{"path":"${wikiVaultPath}/EntityName.md","content":"---\\nwiki_sources: [${sourcePath}]\\nwiki_updated: ${today}\\nwiki_status: stub\\ntags: []\\n---\\n# EntityName\\n\\ncont\u0435\u043D\u0442..."}]`
+  ].filter((s) => s !== null).join("\n");
+  return [
+    { role: "system", content: systemContent },
+    {
+      role: "user",
+      content: [
+        `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
+        `Wiki-\u043F\u0430\u043F\u043A\u0430: ${wikiVaultPath}`,
+        ``,
+        `\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ${sourcePath}`,
+        sourceContent.slice(0, 8e3),
+        ``,
+        `\u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0435 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
+${existing}`,
+        indexContent ? `
+\u0418\u043D\u0434\u0435\u043A\u0441 wiki (_index.md):
+${indexContent.slice(0, 2e3)}` : ""
+      ].filter(Boolean).join("\n")
+    }
+  ];
+}
+
+// src/phases/query.ts
+var import_node_path3 = require("node:path");
+var MAX_CONTEXT_CHARS = 8e4;
+var META_FILES = ["_index.md", "_log.md", "_schema.md"];
+async function* runQuery(args, save, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
+  const question = args[0]?.trim();
+  if (!question) {
+    yield { kind: "error", message: "query: question required" };
+    return;
+  }
+  const domain = domains[0];
+  if (!domain) {
+    yield { kind: "error", message: "No domain configured. Add a domain in settings." };
+    return;
+  }
+  const absWiki = (0, import_node_path3.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path3.join)(repoRoot, domain.wiki_folder);
+  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
+  if (!wikiVaultPath) {
+    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
+    return;
+  }
+  const wikiRoot = wikiVaultPath.split("/").slice(0, -1).join("/");
+  yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
+  const allFiles = await vaultTools.listFiles(wikiVaultPath);
+  const files = allFiles.filter((f) => !META_FILES.some((m) => f.endsWith(m)));
+  yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
+  const [indexContent, schemaContent] = await Promise.all([
+    tryRead2(vaultTools, `${wikiRoot}/_index.md`),
+    tryRead2(vaultTools, `${wikiRoot}/_schema.md`)
+  ]);
+  const pages = await vaultTools.readAll(files);
+  const start = Date.now();
+  let contextBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---
+${c}`).join("\n\n");
+  if (contextBlock.length > MAX_CONTEXT_CHARS) {
+    contextBlock = contextBlock.slice(0, MAX_CONTEXT_CHARS) + "\n[...truncated]";
+  }
+  const entityTypesBlock = buildEntityTypesBlock2(domain);
+  const indexBlock = indexContent ? `
+
+\u0412\u0438\u043A\u0438-\u0438\u043D\u0434\u0435\u043A\u0441 (_index.md):
+${indexContent.slice(0, 3e3)}` : "";
+  const schemaBlock = schemaContent ? `
+
+\u041A\u043E\u043D\u0432\u0435\u043D\u0446\u0438\u0438 (_schema.md):
+${schemaContent.slice(0, 2e3)}` : "";
+  const systemPrompt = [
+    `\u0422\u044B \u2014 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442 \u043F\u043E wiki-\u0431\u0430\u0437\u0435 \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
+    `\u041E\u0442\u0432\u0435\u0447\u0430\u0439 \u0441\u0442\u0440\u043E\u0433\u043E \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 \u043F\u0440\u0435\u0434\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0445 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446. \u0411\u0443\u0434\u044C \u0442\u043E\u0447\u0435\u043D \u0438 \u043B\u0430\u043A\u043E\u043D\u0438\u0447\u0435\u043D.`,
+    `\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439 WikiLinks [[\u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435]] \u043F\u0440\u0438 \u0441\u0441\u044B\u043B\u043A\u0430\u0445 \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0438\u0437 \u0438\u043D\u0434\u0435\u043A\u0441\u0430.`,
+    entityTypesBlock,
+    schemaBlock,
+    indexBlock
+  ].filter(Boolean).join("\n\n");
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `\u0412\u043E\u043F\u0440\u043E\u0441: ${question}
+
+Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
+${contextBlock}` }
+  ];
+  const params = buildChatParams(model, messages, opts);
+  let answer = "";
+  try {
+    const stream = await llm.chat.completions.create(
+      { ...params, stream: true },
+      { signal }
+    );
+    for await (const chunk of stream) {
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning)
+        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) {
+        answer += content;
+        yield { kind: "assistant_text", delta: content };
+      }
+    }
+  } catch (e) {
+    if (signal.aborted || e.name === "AbortError")
+      return;
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false }
+    );
+    answer = resp.choices[0]?.message?.content ?? "";
+    if (answer)
+      yield { kind: "assistant_text", delta: answer };
+  }
+  if (signal.aborted)
+    return;
+  if (save && answer) {
+    const slug = question.slice(0, 40).replace(/[^a-zA-Z0-9а-яёА-ЯЁ\s]/g, "").trim().replace(/\s+/g, "-");
+    const savePath = `${wikiVaultPath}/Q-${slug}.md`;
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const pageContent = [
+      `---`,
+      `wiki_sources: []`,
+      `wiki_updated: ${today}`,
+      `wiki_status: mature`,
+      `tags: []`,
+      `---`,
+      ``,
+      `# ${question}`,
+      ``,
+      answer
+    ].join("\n");
+    yield { kind: "tool_use", name: "Write", input: { path: savePath } };
+    try {
+      await vaultTools.write(savePath, pageContent);
+      yield { kind: "tool_result", ok: true };
+      yield { kind: "result", durationMs: Date.now() - start, text: `\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430: ${savePath}
+
+${answer}` };
+    } catch (e) {
+      yield { kind: "tool_result", ok: false, preview: e.message };
+      yield { kind: "result", durationMs: Date.now() - start, text: answer };
+    }
+  } else {
+    yield { kind: "result", durationMs: Date.now() - start, text: answer };
+  }
+}
+async function tryRead2(vaultTools, path2) {
+  try {
+    return await vaultTools.read(path2);
+  } catch {
+    return "";
+  }
+}
+function buildEntityTypesBlock2(domain) {
+  if (!domain.entity_types?.length)
+    return "";
+  const types = domain.entity_types.map((et) => `  - ${et.type}: ${et.description}`).join("\n");
+  const notes = domain.language_notes ? `
+\u042F\u0437\u044B\u043A\u043E\u0432\u044B\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u0430: ${domain.language_notes}` : "";
+  return `\u0422\u0438\u043F\u044B \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0435\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB:
+${types}${notes}`;
+}
+
+// src/phases/lint.ts
+var import_node_path4 = require("node:path");
+var META_FILES2 = ["_index.md", "_log.md", "_schema.md"];
+async function* runLint(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
+  const domainId = args[0];
+  const targets = domainId ? domains.filter((d) => d.id === domainId) : domains;
+  if (targets.length === 0) {
+    yield { kind: "error", message: domainId ? `Domain "${domainId}" not found.` : "No domains configured." };
+    return;
+  }
+  const start = Date.now();
+  const reportParts = [];
+  for (const domain of targets) {
+    if (signal.aborted)
+      return;
+    const absWiki = (0, import_node_path4.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path4.join)(repoRoot, domain.wiki_folder);
+    const wikiVaultPath = vaultTools.toVaultPath(absWiki);
+    if (!wikiVaultPath) {
+      reportParts.push(`## ${domain.id}
+Wiki folder outside vault \u2014 skipped.`);
+      continue;
+    }
+    yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
+    const allFiles = await vaultTools.listFiles(wikiVaultPath);
+    const files = allFiles.filter((f) => !META_FILES2.some((m) => f.endsWith(m)));
+    yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
+    const pages = await vaultTools.readAll(files);
+    const structuralIssues = checkStructure(pages);
+    const entityTypesBlock = buildEntityTypesBlock3(domain);
+    yield { kind: "assistant_text", delta: `Evaluating domain "${domain.id}" quality...
+` };
+    const messages = [
+      {
+        role: "system",
+        content: [
+          `\u0422\u044B \u2014 \u0440\u0435\u0446\u0435\u043D\u0437\u0435\u043D\u0442 \u043A\u0430\u0447\u0435\u0441\u0442\u0432\u0430 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
+          `\u0412\u044B\u044F\u0432\u043B\u044F\u0439: \u0434\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435, \u043F\u0440\u043E\u0431\u0435\u043B\u044B, \u0440\u0430\u0437\u043C\u044B\u0442\u044B\u0435 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F, \u0443\u0441\u0442\u0430\u0440\u0435\u0432\u0448\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442.`,
+          `\u0412\u0435\u0440\u043D\u0438 \u043A\u0440\u0430\u0442\u043A\u0438\u0439 \u043E\u0442\u0447\u0451\u0442 \u0432 markdown.`,
+          entityTypesBlock ? `
+\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419 \u0414\u041E\u041C\u0415\u041D\u0410:
+${entityTypesBlock}` : ""
+        ].filter(Boolean).join("\n")
+      },
+      {
+        role: "user",
+        content: [
+          `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
+          `\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
+${structuralIssues || "\u041D\u0435\u0442."}`,
+          "",
+          `Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
+${[...pages.entries()].map(([p, c]) => `--- ${p} ---
+${c.slice(0, 500)}`).join("\n\n")}`
+        ].join("\n")
+      }
+    ];
+    const params = buildChatParams(model, messages, opts);
+    let llmReport = "";
+    try {
+      const stream = await llm.chat.completions.create(
+        { ...params, stream: true },
+        { signal }
+      );
+      for await (const chunk of stream) {
+        const { reasoning, content } = extractStreamDeltas(chunk);
+        if (reasoning)
+          yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+        if (content) {
+          llmReport += content;
+          yield { kind: "assistant_text", delta: content };
+        }
+      }
+    } catch (e) {
+      if (signal.aborted || e.name === "AbortError")
+        return;
+      const resp = await llm.chat.completions.create(
+        { ...params, stream: false }
+      );
+      llmReport = resp.choices[0]?.message?.content ?? "";
+      if (llmReport)
+        yield { kind: "assistant_text", delta: llmReport };
+    }
+    reportParts.push(`## ${domain.id}
+${structuralIssues ? `**\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:**
+${structuralIssues}
+
+` : ""}${llmReport}`);
+  }
+  yield { kind: "result", durationMs: Date.now() - start, text: reportParts.join("\n\n---\n\n") };
+}
+function checkStructure(pages) {
+  const issues = [];
+  for (const [path2, content] of pages) {
+    if (!content.startsWith("---")) {
+      issues.push(`- ${path2}: missing frontmatter`);
+    }
+    const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
+    for (const link of links) {
+      const linked = [...pages.keys()].some((p) => p.endsWith(`${link}.md`));
+      if (!linked)
+        issues.push(`- ${path2}: dead link [[${link}]]`);
+    }
+  }
+  return issues.join("\n");
+}
+function buildEntityTypesBlock3(domain) {
+  if (!domain.entity_types?.length)
+    return "";
+  return domain.entity_types.map((et) => `- ${et.type}: ${et.description}`).join("\n");
+}
+
+// src/phases/init.ts
+async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultName, domainMapDir, signal, opts = {}) {
+  const domainId = args[0];
+  const dryRun = args.includes("--dry-run");
+  if (!domainId) {
+    yield { kind: "error", message: "init: domain id required" };
+    return;
+  }
+  const existing = domains.find((d) => d.id === domainId);
+  if (existing) {
+    yield { kind: "error", message: `Domain "${domainId}" already exists in domain-map.` };
+    return;
+  }
+  yield { kind: "assistant_text", delta: `Bootstrapping domain "${domainId}"...
+` };
+  const start = Date.now();
+  const allFiles = await vaultTools.listFiles("");
+  const sampleFiles = allFiles.slice(0, 5);
+  const samples = await vaultTools.readAll(sampleFiles);
+  const wikiRootGuess = `!Wiki`;
+  const [schemaContent, indexContent] = await Promise.all([
+    tryRead3(vaultTools, `${wikiRootGuess}/_schema.md`),
+    tryRead3(vaultTools, `${wikiRootGuess}/_index.md`)
+  ]);
+  const systemContent = [
+    `\u0422\u044B \u2014 \u0430\u0440\u0445\u0438\u0442\u0435\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439. \u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u0443\u0439 \u0437\u0430\u043F\u0438\u0441\u044C \u0434\u043E\u043C\u0435\u043D\u0430 \u0434\u043B\u044F domain-map.json.`,
+    `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E \u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u044B:`,
+    `{`,
+    `  "id": "${domainId}",`,
+    `  "name": "\u0427\u0435\u043B\u043E\u0432\u0435\u043A\u043E\u0447\u0438\u0442\u0430\u0435\u043C\u043E\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435",`,
+    `  "wiki_folder": "vaults/${vaultName}/!Wiki/${domainId}",`,
+    `  "source_paths": ["relative/source/path"],`,
+    `  "entity_types": [{"type":"...","description":"...","extraction_cues":["..."],"min_mentions_for_page":1,"wiki_subfolder":"${domainId}/..."}],`,
+    `  "language_notes": ""`,
+    `}`,
+    schemaContent ? `
+\u041A\u043E\u043D\u0432\u0435\u043D\u0446\u0438\u0438 \u0432\u0438\u043A\u0438 (_schema.md):
+${schemaContent.slice(0, 1500)}` : "",
+    indexContent ? `
+\u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0430\u044F \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430 (_index.md):
+${indexContent.slice(0, 1e3)}` : ""
+  ].filter(Boolean).join("\n");
+  const messages = [
+    { role: "system", content: systemContent },
+    {
+      role: "user",
+      content: [
+        `Domain ID: ${domainId}`,
+        `Vault name: ${vaultName}`,
+        "",
+        `\u041F\u0440\u0438\u043C\u0435\u0440\u044B \u0444\u0430\u0439\u043B\u043E\u0432 vault:`,
+        [...samples.entries()].map(([p, c]) => `${p}:
+${c.slice(0, 400)}`).join("\n\n")
+      ].join("\n")
+    }
+  ];
+  const params = buildChatParams(model, messages, opts);
+  let fullText = "";
+  try {
+    const stream = await llm.chat.completions.create(
+      { ...params, stream: true },
+      { signal }
+    );
+    for await (const chunk of stream) {
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning)
+        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) {
+        fullText += content;
+        yield { kind: "assistant_text", delta: content };
+      }
+    }
+  } catch (e) {
+    if (signal.aborted || e.name === "AbortError")
+      return;
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false }
+    );
+    fullText = resp.choices[0]?.message?.content ?? "";
+    if (fullText)
+      yield { kind: "assistant_text", delta: fullText };
+  }
+  if (signal.aborted)
+    return;
+  let entry;
+  try {
+    const match = fullText.match(/\{[\s\S]*\}/);
+    if (!match)
+      throw new Error("No JSON object found in LLM response");
+    entry = JSON.parse(match[0]);
+    if (!entry.id || !entry.wiki_folder)
+      throw new Error("Missing required fields");
+  } catch (e) {
+    yield { kind: "error", message: `Failed to parse domain entry: ${e.message}` };
+    return;
+  }
+  if (dryRun) {
+    yield {
+      kind: "result",
+      durationMs: Date.now() - start,
+      text: `Dry run \u2014 domain entry:
+\`\`\`json
+${JSON.stringify(entry, null, 2)}
+\`\`\``
+    };
+    return;
+  }
+  const { domainMapPath: domainMapPath2, addDomain: addDomain2 } = await Promise.resolve().then(() => (init_domain_map(), domain_map_exports));
+  const dmPath = domainMapPath2(domainMapDir, vaultName);
+  yield { kind: "tool_use", name: "Write", input: { path: dmPath } };
+  try {
+    const result = addDomain2(domainMapDir, vaultName, repoRoot, {
+      id: entry.id,
+      name: entry.name ?? entry.id,
+      wikiFolder: entry.wiki_folder,
+      sourcePaths: entry.source_paths ?? []
+    });
+    if (!result.ok) {
+      yield { kind: "tool_result", ok: false, preview: result.error };
+      yield { kind: "error", message: result.error };
+      return;
+    }
+    yield { kind: "tool_result", ok: true };
+  } catch (e) {
+    yield { kind: "tool_result", ok: false, preview: e.message };
+    yield { kind: "error", message: e.message };
+    return;
+  }
+  await appendLog2(vaultTools, wikiRootGuess, domainId);
+  yield {
+    kind: "result",
+    durationMs: Date.now() - start,
+    text: `Domain "${domainId}" initialised. Edit domain-map to refine source_paths and entity_types.`
+  };
+}
+async function appendLog2(vaultTools, wikiRoot, domainId) {
+  const logPath = `${wikiRoot}/_log.md`;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const entry = `
+## ${today} \u2014 init \u2014 ${domainId}
+- \u0414\u043E\u043C\u0435\u043D \u0441\u043E\u0437\u0434\u0430\u043D
+`;
+  try {
+    const existing = await tryRead3(vaultTools, logPath);
+    await vaultTools.write(logPath, existing + entry);
+  } catch {
+  }
+}
+async function tryRead3(vaultTools, path2) {
+  try {
+    return await vaultTools.read(path2);
+  } catch {
+    return "";
+  }
+}
+
+// src/agent-runner.ts
+var AgentRunner = class {
+  constructor(llm, settings, vaultTools, vaultName, domains, domainMapDir = "") {
+    this.llm = llm;
+    this.settings = settings;
+    this.vaultTools = vaultTools;
+    this.vaultName = vaultName;
+    this.domains = domains;
+    this.domainMapDir = domainMapDir;
+  }
+  buildOpts() {
+    if (this.settings.backend === "claude-agent") {
+      const ca = this.settings.claudeAgent;
+      return {
+        maxTokens: ca.maxTokens,
+        systemPrompt: ca.systemPrompt || void 0
+      };
+    }
+    const na = this.settings.nativeAgent;
+    return {
+      temperature: na.temperature,
+      maxTokens: na.maxTokens,
+      topP: na.topP,
+      systemPrompt: na.systemPrompt || void 0,
+      numCtx: na.numCtx
+    };
+  }
+  async *run(req) {
+    const modelLabel = this.settings.backend === "claude-agent" ? this.settings.claudeAgent.model || "claude" : this.settings.nativeAgent.model;
+    yield { kind: "system", message: `${this.settings.backend} / ${modelLabel}` };
+    if (req.signal.aborted)
+      return;
+    const model = this.settings.backend === "claude-agent" ? this.settings.claudeAgent.model : this.settings.nativeAgent.model;
+    const repoRoot = req.cwd ?? "";
+    const opts = this.buildOpts();
+    const domains = req.domainId ? this.domains.filter((d) => d.id === req.domainId) : this.domains;
+    switch (req.operation) {
+      case "ingest":
+        yield* runIngest(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
+        break;
+      case "query":
+        yield* runQuery(req.args, false, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
+        break;
+      case "query-save":
+        yield* runQuery(req.args, true, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
+        break;
+      case "lint":
+        yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
+        break;
+      case "init":
+        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, this.domainMapDir, req.signal, opts);
+        break;
+      default: {
+        const start = Date.now();
+        yield { kind: "error", message: `Unknown operation: ${req.operation}` };
+        yield { kind: "result", durationMs: Date.now() - start, text: "" };
+      }
+    }
+  }
+};
+
+// src/vault-tools.ts
+var VaultTools = class {
+  constructor(adapter, basePath) {
+    this.adapter = adapter;
+    this.basePath = basePath;
+  }
+  async read(vaultPath) {
+    return this.adapter.read(vaultPath);
+  }
+  async write(vaultPath, content) {
+    const dir = vaultPath.split("/").slice(0, -1).join("/");
+    if (dir) {
+      const dirExists = await this.adapter.exists(dir);
+      if (!dirExists)
+        await this.adapter.mkdir(dir);
+    }
+    await this.adapter.write(vaultPath, content);
+  }
+  async listFiles(vaultDir) {
+    const exists = await this.adapter.exists(vaultDir);
+    if (!exists)
+      return [];
+    return this._listRecursive(vaultDir);
+  }
+  async _listRecursive(vaultDir) {
+    const result = await this.adapter.list(vaultDir);
+    const deeper = await Promise.all(result.folders.map((f) => this._listRecursive(f)));
+    return [...result.files, ...deeper.flat()];
+  }
+  async readAll(paths) {
+    const entries = await Promise.all(
+      paths.map(async (p) => {
+        try {
+          return [p, await this.read(p)];
+        } catch {
+          return null;
+        }
+      })
+    );
+    return new Map(entries.filter((e) => e !== null));
+  }
+  async exists(vaultPath) {
+    return this.adapter.exists(vaultPath);
+  }
+  toVaultPath(absolutePath) {
+    const base = this.basePath.endsWith("/") ? this.basePath : this.basePath + "/";
+    if (!absolutePath.startsWith(base))
+      return null;
+    return absolutePath.slice(base.length);
+  }
+};
+
+// src/claude-cli-client.ts
 var import_node_child_process = require("node:child_process");
 var import_node_readline = require("node:readline");
 
@@ -1067,120 +1835,62 @@ function truncate2(s, n) {
   return s.length <= n ? s : s.slice(0, n) + "\u2026";
 }
 
-// src/prompt.ts
-var QUOTED_OPS = ["ingest", "query", "query-save"];
-function buildPrompt({ operation, args }) {
-  for (const a of args) {
-    if (a.includes("\n") || a.includes("\r")) {
-      throw new Error("Argument contains newline character \u2014 refusing to build prompt");
-    }
-    if (a.includes("\\")) {
-      throw new Error("Argument contains backslash \u2014 refusing to build prompt");
-    }
-  }
-  if (operation === "query-save") {
-    const [question, ...rest] = args;
-    if (!question)
-      throw new Error("query-save requires a question argument");
-    return `/llm-wiki query "${escapeQuotes(question)}"${rest.map(formatTail).join("")} --save`;
-  }
-  if (QUOTED_OPS.includes(operation)) {
-    const [primary, ...rest] = args;
-    if (!primary)
-      throw new Error(`${operation} requires a primary argument`);
-    const op = operation === "query-save" ? "query" : operation;
-    return `/llm-wiki ${op} "${escapeQuotes(primary)}"${rest.map(formatTail).join("")}`;
-  }
-  const tail = args.length > 0 ? " " + args.join(" ") : "";
-  return `/llm-wiki ${operation}${tail}`;
-}
-function escapeQuotes(s) {
-  return s.replace(/"/g, '\\"');
-}
-function formatTail(arg) {
-  return arg.startsWith("--") ? ` ${arg}` : ` "${escapeQuotes(arg)}"`;
-}
-
-// src/runner.ts
-var STDERR_BUFFER_BYTES = 64 * 1024;
+// src/claude-cli-client.ts
 var SIGTERM_GRACE_MS = 3e3;
-var IclaudeRunner = class {
+var ClaudeCliClient = class {
   constructor(cfg) {
     this.cfg = cfg;
   }
-  stdin = null;
-  sendToolResult(toolUseId, answer) {
-    if (!this.stdin || this.stdin.destroyed)
-      return false;
-    const payload = JSON.stringify({
-      type: "user",
-      message: {
-        role: "user",
-        content: [{ type: "tool_result", tool_use_id: toolUseId, content: answer }]
-      }
-    });
-    this.stdin.write(payload + "\n");
-    return true;
+  chat = {
+    completions: {
+      create: (params, opts) => this._create(params, opts)
+    }
+  };
+  _create(params, opts) {
+    const messages = params.messages;
+    const systemContent = messages.filter((m) => m.role === "system").map((m) => typeof m.content === "string" ? m.content : "").join("\n\n");
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
+    const { iclaudePath, model, maxTokens, requestTimeoutSec } = this.cfg;
+    const args = ["-p", userText, "--output-format", "stream-json", "--verbose"];
+    if (model)
+      args.push("--model", model);
+    if (maxTokens)
+      args.push("--max-tokens", String(maxTokens));
+    if (systemContent)
+      args.push("--system", systemContent);
+    if (params.stream) {
+      return Promise.resolve(this._makeIterable(args, opts?.signal, requestTimeoutSec));
+    }
+    return this._collect(args, opts?.signal, requestTimeoutSec);
   }
-  async *run(req) {
-    if (this.stdin !== null) {
-      throw new Error("IclaudeRunner: concurrent run() calls are not supported");
-    }
-    const prompt = buildPrompt({ operation: req.operation, args: req.args });
-    const claudeArgs = [
-      "--",
-      "-p",
-      prompt,
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--allowed-tools",
-      this.cfg.allowedTools.join(",")
-    ];
-    if (this.cfg.model)
-      claudeArgs.push("--model", this.cfg.model);
-    const args = this.cfg.extraArgsForFixture ? [...this.cfg.extraArgsForFixture] : claudeArgs;
-    const child = (0, import_node_child_process.spawn)(this.cfg.iclaudePath, args, {
-      cwd: req.cwd,
-      env: process.env,
-      stdio: ["pipe", "pipe", "pipe"]
-    });
-    if (!child.stdout || !child.stderr || !child.stdin) {
-      throw new Error("spawn did not open expected stdio pipes");
-    }
-    this.stdin = child.stdin;
-    const stderrBuf = [];
-    let stderrBytes = 0;
-    child.stderr.on("data", (chunk) => {
-      stderrBytes += chunk.length;
-      stderrBuf.push(chunk);
-      while (stderrBytes > STDERR_BUFFER_BYTES && stderrBuf.length > 1) {
-        const dropped = stderrBuf.shift();
-        stderrBytes -= dropped.length;
-      }
-    });
+  _makeIterable(args, signal, timeoutSec) {
+    return { [Symbol.asyncIterator]: () => this._generate(args, signal, timeoutSec) };
+  }
+  async *_generate(args, signal, timeoutSec) {
+    const child = (0, import_node_child_process.spawn)(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    if (!child.stdout || !child.stderr)
+      throw new Error("spawn: missing stdio");
+    child.stderr.resume();
     const onAbort = () => {
-      if (child.exitCode !== null)
-        return;
       child.kill("SIGTERM");
       setTimeout(() => {
         if (child.exitCode === null)
           child.kill("SIGKILL");
       }, SIGTERM_GRACE_MS);
     };
-    if (req.signal.aborted)
+    if (signal?.aborted) {
       onAbort();
-    else
-      req.signal.addEventListener("abort", onAbort, { once: true });
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
     const timeoutHandle = setTimeout(() => {
-      if (child.exitCode === null) {
-        child.kill("SIGTERM");
-        setTimeout(() => {
-          if (child.exitCode === null)
-            child.kill("SIGKILL");
-        }, SIGTERM_GRACE_MS);
-      }
-    }, req.timeoutMs);
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        if (child.exitCode === null)
+          child.kill("SIGKILL");
+      }, SIGTERM_GRACE_MS);
+    }, timeoutSec * 1e3);
     const queue = [];
     let resolveNext = null;
     const wake = () => {
@@ -1189,30 +1899,29 @@ var IclaudeRunner = class {
         resolveNext = null;
       }
     };
+    let id = 0;
     const rl = (0, import_node_readline.createInterface)({ input: child.stdout });
     rl.on("line", (line) => {
       const ev = parseStreamLine(line);
-      if (ev)
-        queue.push(ev);
-      wake();
+      if (ev?.kind === "assistant_text") {
+        const delta = ev.isReasoning ? { reasoning: ev.delta } : { content: ev.delta };
+        queue.push({
+          id: `cc-${++id}`,
+          object: "chat.completion.chunk",
+          model: "",
+          created: 0,
+          choices: [{ index: 0, delta, finish_reason: null }]
+        });
+        wake();
+      }
     });
     let exited = false;
-    let exitCode = 0;
-    child.on("error", (err) => {
-      queue.push({ kind: "error", message: `spawn error: ${err.message}` });
+    child.on("close", () => {
       exited = true;
-      exitCode = -1;
-      this.stdin = null;
       wake();
     });
-    child.on("close", (code) => {
-      if (stderrBuf.length > 0 && code !== 0) {
-        const tail = Buffer.concat(stderrBuf).toString("utf-8").slice(-4096);
-        queue.push({ kind: "error", message: `stderr: ${tail}` });
-      }
+    child.on("error", () => {
       exited = true;
-      exitCode = code ?? -1;
-      this.stdin = null;
       wake();
     });
     try {
@@ -1225,18 +1934,34 @@ var IclaudeRunner = class {
           break;
         await new Promise((r) => resolveNext = r);
       }
-      yield { kind: "exit", code: exitCode };
+      yield {
+        id: `cc-${++id}`,
+        object: "chat.completion.chunk",
+        model: "",
+        created: 0,
+        choices: [{ index: 0, delta: {}, finish_reason: "stop" }]
+      };
     } finally {
       clearTimeout(timeoutHandle);
-      req.signal.removeEventListener("abort", onAbort);
+      signal?.removeEventListener("abort", onAbort);
       rl.close();
-      this.stdin = null;
     }
   }
+  async _collect(args, signal, timeoutSec) {
+    let text = "";
+    for await (const chunk of this._generate(args, signal, timeoutSec)) {
+      text += chunk.choices[0]?.delta?.content ?? "";
+    }
+    return {
+      id: "cc-0",
+      object: "chat.completion",
+      model: "",
+      created: 0,
+      choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop", logprobs: null }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+    };
+  }
 };
-
-// src/controller.ts
-init_domain_map();
 
 // node_modules/openai/internal/tslib.mjs
 function __classPrivateFieldSet(receiver, state, value, kind, f) {
@@ -1477,7 +2202,7 @@ var safeJSON = (text) => {
 };
 
 // node_modules/openai/internal/utils/sleep.mjs
-var sleep = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
+var sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // node_modules/openai/version.mjs
 var VERSION = "6.34.0";
@@ -2556,8 +3281,8 @@ function addRequestID(value, response) {
 var _APIPromise_client;
 var APIPromise = class _APIPromise extends Promise {
   constructor(client, responsePromise, parseResponse2 = defaultParseResponse) {
-    super((resolve2) => {
-      resolve2(null);
+    super((resolve) => {
+      resolve(null);
     });
     this.responsePromise = responsePromise;
     this.parseResponse = parseResponse2;
@@ -3205,12 +3930,12 @@ var EventStream = class {
     _EventStream_errored.set(this, false);
     _EventStream_aborted.set(this, false);
     _EventStream_catchingPromiseCreated.set(this, false);
-    __classPrivateFieldSet(this, _EventStream_connectedPromise, new Promise((resolve2, reject) => {
-      __classPrivateFieldSet(this, _EventStream_resolveConnectedPromise, resolve2, "f");
+    __classPrivateFieldSet(this, _EventStream_connectedPromise, new Promise((resolve, reject) => {
+      __classPrivateFieldSet(this, _EventStream_resolveConnectedPromise, resolve, "f");
       __classPrivateFieldSet(this, _EventStream_rejectConnectedPromise, reject, "f");
     }), "f");
-    __classPrivateFieldSet(this, _EventStream_endPromise, new Promise((resolve2, reject) => {
-      __classPrivateFieldSet(this, _EventStream_resolveEndPromise, resolve2, "f");
+    __classPrivateFieldSet(this, _EventStream_endPromise, new Promise((resolve, reject) => {
+      __classPrivateFieldSet(this, _EventStream_resolveEndPromise, resolve, "f");
       __classPrivateFieldSet(this, _EventStream_rejectEndPromise, reject, "f");
     }), "f");
     __classPrivateFieldGet(this, _EventStream_connectedPromise, "f").catch(() => {
@@ -3294,11 +4019,11 @@ var EventStream = class {
    *   const message = await stream.emitted('message') // rejects if the stream errors
    */
   emitted(event) {
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve, reject) => {
       __classPrivateFieldSet(this, _EventStream_catchingPromiseCreated, true, "f");
       if (event !== "error")
         this.once("error", reject);
-      this.once(event, resolve2);
+      this.once(event, resolve);
     });
   }
   async done() {
@@ -4237,7 +4962,7 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
           if (done) {
             return { value: void 0, done: true };
           }
-          return new Promise((resolve2, reject) => readQueue.push({ resolve: resolve2, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+          return new Promise((resolve, reject) => readQueue.push({ resolve, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
         }
         const chunk = pushQueue.shift();
         return { value: chunk, done: false };
@@ -5069,7 +5794,7 @@ var AssistantStream = class extends EventStream {
           if (done) {
             return { value: void 0, done: true };
           }
-          return new Promise((resolve2, reject) => readQueue.push({ resolve: resolve2, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+          return new Promise((resolve, reject) => readQueue.push({ resolve, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
         }
         const chunk = pushQueue.shift();
         return { value: chunk, done: false };
@@ -7016,7 +7741,7 @@ var ResponseStream = class _ResponseStream extends EventStream {
           if (done) {
             return { value: void 0, done: true };
           }
-          return new Promise((resolve2, reject) => readQueue.push({ resolve: resolve2, reject })).then((event2) => event2 ? { value: event2, done: false } : { value: void 0, done: true });
+          return new Promise((resolve, reject) => readQueue.push({ resolve, reject })).then((event2) => event2 ? { value: event2, done: false } : { value: void 0, done: true });
         }
         const event = pushQueue.shift();
         return { value: event, done: false };
@@ -8387,788 +9112,6 @@ OpenAI.Containers = Containers;
 OpenAI.Skills = Skills;
 OpenAI.Videos = Videos;
 
-// src/phases/ingest.ts
-var import_node_path3 = require("node:path");
-
-// src/phases/llm-utils.ts
-function extractStreamDeltas(chunk) {
-  const delta = chunk.choices[0]?.delta;
-  const rawReasoning = delta?.reasoning;
-  return {
-    reasoning: typeof rawReasoning === "string" ? rawReasoning : "",
-    content: typeof delta?.content === "string" ? delta.content : ""
-  };
-}
-function buildChatParams(model, messages, opts) {
-  const msgs = opts.systemPrompt ? injectSystemPrompt(messages, opts.systemPrompt) : messages;
-  const params = { model, messages: msgs };
-  if (opts.temperature !== void 0)
-    params.temperature = opts.temperature;
-  if (opts.maxTokens != null)
-    params.max_tokens = opts.maxTokens;
-  if (opts.topP != null)
-    params.top_p = opts.topP;
-  if (opts.numCtx != null)
-    params.num_ctx = opts.numCtx;
-  return params;
-}
-function injectSystemPrompt(messages, systemPrompt) {
-  const firstSystem = messages.findIndex((m) => m.role === "system");
-  if (firstSystem >= 0) {
-    const updated = [...messages];
-    const existing = typeof updated[firstSystem].content === "string" ? updated[firstSystem].content : "";
-    updated[firstSystem] = { role: "system", content: `${systemPrompt}
-
-${existing}` };
-    return updated;
-  }
-  return [{ role: "system", content: systemPrompt }, ...messages];
-}
-
-// src/phases/ingest.ts
-async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
-  const filePath = args[0];
-  if (!filePath) {
-    yield { kind: "error", message: "ingest: file path required" };
-    return;
-  }
-  const absSource = (0, import_node_path3.isAbsolute)(filePath) ? filePath : (0, import_node_path3.join)(repoRoot, filePath);
-  const sourceVaultPath = vaultTools.toVaultPath(absSource);
-  if (!sourceVaultPath) {
-    yield { kind: "error", message: `Source file ${filePath} is outside the vault.` };
-    return;
-  }
-  yield { kind: "tool_use", name: "Read", input: { path: sourceVaultPath } };
-  let sourceContent;
-  try {
-    sourceContent = await vaultTools.read(sourceVaultPath);
-  } catch (e) {
-    yield { kind: "error", message: `Cannot read ${sourceVaultPath}: ${e.message}` };
-    return;
-  }
-  yield { kind: "tool_result", ok: true, preview: sourceContent.slice(0, 100) };
-  const domain = detectDomain(absSource, domains, repoRoot);
-  if (!domain) {
-    yield { kind: "error", message: "No domain found for this file. Configure domain-map." };
-    return;
-  }
-  const absWiki = (0, import_node_path3.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path3.join)(repoRoot, domain.wiki_folder);
-  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
-  if (!wikiVaultPath) {
-    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
-    return;
-  }
-  const wikiRoot = wikiVaultPath.split("/").slice(0, -1).join("/");
-  const [schemaContent, indexContent] = await Promise.all([
-    tryRead(vaultTools, `${wikiRoot}/_schema.md`),
-    tryRead(vaultTools, `${wikiRoot}/_index.md`)
-  ]);
-  const existingPaths = await vaultTools.listFiles(wikiVaultPath);
-  const existingPages = await vaultTools.readAll(existingPaths.filter((f) => !f.endsWith("_index.md")));
-  yield { kind: "assistant_text", delta: `Synthesizing wiki pages for domain "${domain.id}"...
-` };
-  const start = Date.now();
-  const messages = buildIngestMessages(
-    sourceVaultPath,
-    sourceContent,
-    domain,
-    wikiVaultPath,
-    existingPages,
-    schemaContent,
-    indexContent
-  );
-  const params = buildChatParams(model, messages, opts);
-  let fullText = "";
-  try {
-    const stream = await llm.chat.completions.create(
-      { ...params, stream: true },
-      { signal }
-    );
-    for await (const chunk of stream) {
-      const { reasoning, content } = extractStreamDeltas(chunk);
-      if (reasoning)
-        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-      if (content) {
-        fullText += content;
-        yield { kind: "assistant_text", delta: content };
-      }
-    }
-  } catch (e) {
-    if (signal.aborted || e.name === "AbortError")
-      return;
-    const resp = await llm.chat.completions.create(
-      { ...params, stream: false }
-    );
-    fullText = resp.choices[0]?.message?.content ?? "";
-    if (fullText)
-      yield { kind: "assistant_text", delta: fullText };
-  }
-  if (signal.aborted)
-    return;
-  const pages = parseJsonPages(fullText);
-  const written = [];
-  for (const page of pages) {
-    yield { kind: "tool_use", name: "Write", input: { path: page.path } };
-    try {
-      await vaultTools.write(page.path, page.content);
-      written.push(page.path);
-      yield { kind: "tool_result", ok: true };
-    } catch (e) {
-      yield { kind: "tool_result", ok: false, preview: e.message };
-    }
-  }
-  if (written.length > 0) {
-    await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
-    await updateIndex(vaultTools, wikiRoot, written);
-  }
-  yield {
-    kind: "result",
-    durationMs: Date.now() - start,
-    text: pages.length > 0 ? `Ingested into ${pages.length} wiki page(s).` : "Ingested into 0 wiki page(s)."
-  };
-}
-function detectDomain(absFilePath, domains, repoRoot) {
-  for (const d of domains) {
-    const matched = d.source_paths?.some((sp) => {
-      const abs = (0, import_node_path3.isAbsolute)(sp) ? sp : (0, import_node_path3.join)(repoRoot, sp);
-      return absFilePath.startsWith(abs);
-    });
-    if (matched)
-      return d;
-  }
-  return domains[0] ?? null;
-}
-function parseJsonPages(text) {
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match)
-    return [];
-  try {
-    const arr = JSON.parse(match[0]);
-    if (!Array.isArray(arr))
-      return [];
-    return arr.filter(
-      (x) => x !== null && typeof x === "object" && typeof x.path === "string" && typeof x.content === "string"
-    );
-  } catch {
-    return [];
-  }
-}
-async function appendLog(vaultTools, wikiRoot, sourcePath, domainId, written) {
-  const logPath = `${wikiRoot}/_log.md`;
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const entry = `
-## ${today} \u2014 ingest \u2014 ${domainId}
-- \u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ${sourcePath}
-- \u0421\u0442\u0440\u0430\u043D\u0438\u0446: ${written.map((p) => `
-  - ${p}`).join("")}
-`;
-  try {
-    const existing = await tryRead(vaultTools, logPath);
-    await vaultTools.write(logPath, existing + entry);
-  } catch {
-  }
-}
-async function updateIndex(vaultTools, wikiRoot, written) {
-  const indexPath = `${wikiRoot}/_index.md`;
-  try {
-    const existing = await tryRead(vaultTools, indexPath);
-    const newLinks = written.map((p) => {
-      const name = p.split("/").pop()?.replace(/\.md$/, "") ?? p;
-      return `- [[${name}]]`;
-    }).join("\n");
-    const updated = existing ? existing + "\n" + newLinks : `# Wiki Index
-
-${newLinks}`;
-    await vaultTools.write(indexPath, updated);
-  } catch {
-  }
-}
-async function tryRead(vaultTools, path2) {
-  try {
-    return await vaultTools.read(path2);
-  } catch {
-    return "";
-  }
-}
-function buildEntityTypesBlock(domain) {
-  if (!domain.entity_types?.length)
-    return "";
-  return domain.entity_types.map((et) => [
-    `### \u0422\u0438\u043F: ${et.type}`,
-    `\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435: ${et.description}`,
-    `\u041A\u043B\u044E\u0447\u0435\u0432\u044B\u0435 \u0441\u043B\u043E\u0432\u0430: ${et.extraction_cues.join(", ")}`,
-    et.min_mentions_for_page != null ? `\u041C\u0438\u043D. \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439 \u0434\u043B\u044F \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B: ${et.min_mentions_for_page}` : "",
-    et.wiki_subfolder ? `\u041F\u043E\u0434\u043F\u0430\u043F\u043A\u0430 \u0432 wiki: ${et.wiki_subfolder}` : ""
-  ].filter(Boolean).join("\n")).join("\n\n");
-}
-function buildIngestMessages(sourcePath, sourceContent, domain, wikiVaultPath, existingPages, schemaContent, indexContent) {
-  const existing = existingPages.size > 0 ? [...existingPages.entries()].map(([p, c]) => `${p}:
-${c.slice(0, 400)}`).join("\n\n") : "\u041D\u0435\u0442.";
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const entityTypesBlock = buildEntityTypesBlock(domain);
-  const langNotes = domain.language_notes ? `
-\u042F\u0437\u044B\u043A\u043E\u0432\u044B\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u0430: ${domain.language_notes}` : "";
-  const systemContent = [
-    `\u0422\u044B \u2014 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442 \u0441\u0438\u043D\u0442\u0435\u0437\u0430 wiki-\u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043B\u044F \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
-    `\u0418\u0437\u0432\u043B\u0435\u043A\u0430\u0439 \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0438 \u0438\u0437 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u0430 \u0438 \u0441\u043E\u0437\u0434\u0430\u0432\u0430\u0439/\u043E\u0431\u043D\u043E\u0432\u043B\u044F\u0439 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.`,
-    ``,
-    `\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419 \u0414\u041E\u041C\u0415\u041D\u0410:`,
-    entityTypesBlock || "(\u043D\u0435 \u0437\u0430\u0434\u0430\u043D\u044B)",
-    langNotes,
-    ``,
-    `\u041F\u0420\u0410\u0412\u0418\u041B\u0410:`,
-    `- CREATE: \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u044C \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0432 wiki, \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439 >= min_mentions_for_page`,
-    `- UPDATE: \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u044C \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u2192 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043D\u043E\u0432\u0443\u044E \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044E, \u041D\u0415 \u0443\u0434\u0430\u043B\u044F\u0442\u044C \u0441\u0442\u0430\u0440\u0443\u044E`,
-    `- SKIP: \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u0430\u043B\u043E \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u0439 \u0438\u043B\u0438 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044F \u0443\u0436\u0435 \u0435\u0441\u0442\u044C`,
-    `- \u0421\u0438\u043D\u0442\u0435\u0437, \u043D\u0435 \u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435. \u0422\u0435\u0445\u043D\u0438\u0447\u0435\u0441\u043A\u0438\u0435 \u043A\u043E\u043D\u0444\u0438\u0433\u0438/SQL \u043C\u043E\u0436\u043D\u043E \u0446\u0438\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0432 code-\u0431\u043B\u043E\u043A\u0430\u0445.`,
-    `- \u041F\u0443\u0442\u044C \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0434\u043E\u043B\u0436\u0435\u043D \u043D\u0430\u0447\u0438\u043D\u0430\u0442\u044C\u0441\u044F \u0441 "${wikiVaultPath}/"`,
-    `- Frontmatter \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D: wiki_sources, wiki_updated: ${today}, wiki_status: stub|developing|mature`,
-    schemaContent ? `
-\u041A\u041E\u041D\u0412\u0415\u041D\u0426\u0418\u0418 (_schema.md):
-${schemaContent.slice(0, 2e3)}` : "",
-    ``,
-    `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E JSON-\u043C\u0430\u0441\u0441\u0438\u0432, \u0431\u0435\u0437 \u0434\u0440\u0443\u0433\u043E\u0433\u043E \u0442\u0435\u043A\u0441\u0442\u0430:`,
-    `[{"path":"${wikiVaultPath}/EntityName.md","content":"---\\nwiki_sources: [${sourcePath}]\\nwiki_updated: ${today}\\nwiki_status: stub\\ntags: []\\n---\\n# EntityName\\n\\ncont\u0435\u043D\u0442..."}]`
-  ].filter((s) => s !== null).join("\n");
-  return [
-    { role: "system", content: systemContent },
-    {
-      role: "user",
-      content: [
-        `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
-        `Wiki-\u043F\u0430\u043F\u043A\u0430: ${wikiVaultPath}`,
-        ``,
-        `\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ${sourcePath}`,
-        sourceContent.slice(0, 8e3),
-        ``,
-        `\u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0435 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
-${existing}`,
-        indexContent ? `
-\u0418\u043D\u0434\u0435\u043A\u0441 wiki (_index.md):
-${indexContent.slice(0, 2e3)}` : ""
-      ].filter(Boolean).join("\n")
-    }
-  ];
-}
-
-// src/phases/query.ts
-var import_node_path4 = require("node:path");
-var MAX_CONTEXT_CHARS = 8e4;
-var META_FILES = ["_index.md", "_log.md", "_schema.md"];
-async function* runQuery(args, save, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
-  const question = args[0]?.trim();
-  if (!question) {
-    yield { kind: "error", message: "query: question required" };
-    return;
-  }
-  const domain = domains[0];
-  if (!domain) {
-    yield { kind: "error", message: "No domain configured. Add a domain in settings." };
-    return;
-  }
-  const absWiki = (0, import_node_path4.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path4.join)(repoRoot, domain.wiki_folder);
-  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
-  if (!wikiVaultPath) {
-    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
-    return;
-  }
-  const wikiRoot = wikiVaultPath.split("/").slice(0, -1).join("/");
-  yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
-  const allFiles = await vaultTools.listFiles(wikiVaultPath);
-  const files = allFiles.filter((f) => !META_FILES.some((m) => f.endsWith(m)));
-  yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
-  const [indexContent, schemaContent] = await Promise.all([
-    tryRead2(vaultTools, `${wikiRoot}/_index.md`),
-    tryRead2(vaultTools, `${wikiRoot}/_schema.md`)
-  ]);
-  const pages = await vaultTools.readAll(files);
-  const start = Date.now();
-  let contextBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---
-${c}`).join("\n\n");
-  if (contextBlock.length > MAX_CONTEXT_CHARS) {
-    contextBlock = contextBlock.slice(0, MAX_CONTEXT_CHARS) + "\n[...truncated]";
-  }
-  const entityTypesBlock = buildEntityTypesBlock2(domain);
-  const indexBlock = indexContent ? `
-
-\u0412\u0438\u043A\u0438-\u0438\u043D\u0434\u0435\u043A\u0441 (_index.md):
-${indexContent.slice(0, 3e3)}` : "";
-  const schemaBlock = schemaContent ? `
-
-\u041A\u043E\u043D\u0432\u0435\u043D\u0446\u0438\u0438 (_schema.md):
-${schemaContent.slice(0, 2e3)}` : "";
-  const systemPrompt = [
-    `\u0422\u044B \u2014 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442 \u043F\u043E wiki-\u0431\u0430\u0437\u0435 \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
-    `\u041E\u0442\u0432\u0435\u0447\u0430\u0439 \u0441\u0442\u0440\u043E\u0433\u043E \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 \u043F\u0440\u0435\u0434\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u043D\u044B\u0445 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446. \u0411\u0443\u0434\u044C \u0442\u043E\u0447\u0435\u043D \u0438 \u043B\u0430\u043A\u043E\u043D\u0438\u0447\u0435\u043D.`,
-    `\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439 WikiLinks [[\u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435]] \u043F\u0440\u0438 \u0441\u0441\u044B\u043B\u043A\u0430\u0445 \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0438\u0437 \u0438\u043D\u0434\u0435\u043A\u0441\u0430.`,
-    entityTypesBlock,
-    schemaBlock,
-    indexBlock
-  ].filter(Boolean).join("\n\n");
-  const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: `\u0412\u043E\u043F\u0440\u043E\u0441: ${question}
-
-Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
-${contextBlock}` }
-  ];
-  const params = buildChatParams(model, messages, opts);
-  let answer = "";
-  try {
-    const stream = await llm.chat.completions.create(
-      { ...params, stream: true },
-      { signal }
-    );
-    for await (const chunk of stream) {
-      const { reasoning, content } = extractStreamDeltas(chunk);
-      if (reasoning)
-        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-      if (content) {
-        answer += content;
-        yield { kind: "assistant_text", delta: content };
-      }
-    }
-  } catch (e) {
-    if (signal.aborted || e.name === "AbortError")
-      return;
-    const resp = await llm.chat.completions.create(
-      { ...params, stream: false }
-    );
-    answer = resp.choices[0]?.message?.content ?? "";
-    if (answer)
-      yield { kind: "assistant_text", delta: answer };
-  }
-  if (signal.aborted)
-    return;
-  if (save && answer) {
-    const slug = question.slice(0, 40).replace(/[^a-zA-Z0-9а-яёА-ЯЁ\s]/g, "").trim().replace(/\s+/g, "-");
-    const savePath = `${wikiVaultPath}/Q-${slug}.md`;
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    const pageContent = [
-      `---`,
-      `wiki_sources: []`,
-      `wiki_updated: ${today}`,
-      `wiki_status: mature`,
-      `tags: []`,
-      `---`,
-      ``,
-      `# ${question}`,
-      ``,
-      answer
-    ].join("\n");
-    yield { kind: "tool_use", name: "Write", input: { path: savePath } };
-    try {
-      await vaultTools.write(savePath, pageContent);
-      yield { kind: "tool_result", ok: true };
-      yield { kind: "result", durationMs: Date.now() - start, text: `\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430: ${savePath}
-
-${answer}` };
-    } catch (e) {
-      yield { kind: "tool_result", ok: false, preview: e.message };
-      yield { kind: "result", durationMs: Date.now() - start, text: answer };
-    }
-  } else {
-    yield { kind: "result", durationMs: Date.now() - start, text: answer };
-  }
-}
-async function tryRead2(vaultTools, path2) {
-  try {
-    return await vaultTools.read(path2);
-  } catch {
-    return "";
-  }
-}
-function buildEntityTypesBlock2(domain) {
-  if (!domain.entity_types?.length)
-    return "";
-  const types = domain.entity_types.map((et) => `  - ${et.type}: ${et.description}`).join("\n");
-  const notes = domain.language_notes ? `
-\u042F\u0437\u044B\u043A\u043E\u0432\u044B\u0435 \u043F\u0440\u0430\u0432\u0438\u043B\u0430: ${domain.language_notes}` : "";
-  return `\u0422\u0438\u043F\u044B \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0435\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB:
-${types}${notes}`;
-}
-
-// src/phases/lint.ts
-var import_node_path5 = require("node:path");
-var META_FILES2 = ["_index.md", "_log.md", "_schema.md"];
-async function* runLint(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
-  const domainId = args[0];
-  const targets = domainId ? domains.filter((d) => d.id === domainId) : domains;
-  if (targets.length === 0) {
-    yield { kind: "error", message: domainId ? `Domain "${domainId}" not found.` : "No domains configured." };
-    return;
-  }
-  const start = Date.now();
-  const reportParts = [];
-  for (const domain of targets) {
-    if (signal.aborted)
-      return;
-    const absWiki = (0, import_node_path5.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path5.join)(repoRoot, domain.wiki_folder);
-    const wikiVaultPath = vaultTools.toVaultPath(absWiki);
-    if (!wikiVaultPath) {
-      reportParts.push(`## ${domain.id}
-Wiki folder outside vault \u2014 skipped.`);
-      continue;
-    }
-    yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
-    const allFiles = await vaultTools.listFiles(wikiVaultPath);
-    const files = allFiles.filter((f) => !META_FILES2.some((m) => f.endsWith(m)));
-    yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
-    const pages = await vaultTools.readAll(files);
-    const structuralIssues = checkStructure(pages);
-    const entityTypesBlock = buildEntityTypesBlock3(domain);
-    yield { kind: "assistant_text", delta: `Evaluating domain "${domain.id}" quality...
-` };
-    const messages = [
-      {
-        role: "system",
-        content: [
-          `\u0422\u044B \u2014 \u0440\u0435\u0446\u0435\u043D\u0437\u0435\u043D\u0442 \u043A\u0430\u0447\u0435\u0441\u0442\u0432\u0430 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
-          `\u0412\u044B\u044F\u0432\u043B\u044F\u0439: \u0434\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435, \u043F\u0440\u043E\u0431\u0435\u043B\u044B, \u0440\u0430\u0437\u043C\u044B\u0442\u044B\u0435 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F, \u0443\u0441\u0442\u0430\u0440\u0435\u0432\u0448\u0438\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442.`,
-          `\u0412\u0435\u0440\u043D\u0438 \u043A\u0440\u0430\u0442\u043A\u0438\u0439 \u043E\u0442\u0447\u0451\u0442 \u0432 markdown.`,
-          entityTypesBlock ? `
-\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419 \u0414\u041E\u041C\u0415\u041D\u0410:
-${entityTypesBlock}` : ""
-        ].filter(Boolean).join("\n")
-      },
-      {
-        role: "user",
-        content: [
-          `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
-          `\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
-${structuralIssues || "\u041D\u0435\u0442."}`,
-          "",
-          `Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
-${[...pages.entries()].map(([p, c]) => `--- ${p} ---
-${c.slice(0, 500)}`).join("\n\n")}`
-        ].join("\n")
-      }
-    ];
-    const params = buildChatParams(model, messages, opts);
-    let llmReport = "";
-    try {
-      const stream = await llm.chat.completions.create(
-        { ...params, stream: true },
-        { signal }
-      );
-      for await (const chunk of stream) {
-        const { reasoning, content } = extractStreamDeltas(chunk);
-        if (reasoning)
-          yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-        if (content) {
-          llmReport += content;
-          yield { kind: "assistant_text", delta: content };
-        }
-      }
-    } catch (e) {
-      if (signal.aborted || e.name === "AbortError")
-        return;
-      const resp = await llm.chat.completions.create(
-        { ...params, stream: false }
-      );
-      llmReport = resp.choices[0]?.message?.content ?? "";
-      if (llmReport)
-        yield { kind: "assistant_text", delta: llmReport };
-    }
-    reportParts.push(`## ${domain.id}
-${structuralIssues ? `**\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:**
-${structuralIssues}
-
-` : ""}${llmReport}`);
-  }
-  yield { kind: "result", durationMs: Date.now() - start, text: reportParts.join("\n\n---\n\n") };
-}
-function checkStructure(pages) {
-  const issues = [];
-  for (const [path2, content] of pages) {
-    if (!content.startsWith("---")) {
-      issues.push(`- ${path2}: missing frontmatter`);
-    }
-    const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
-    for (const link of links) {
-      const linked = [...pages.keys()].some((p) => p.endsWith(`${link}.md`));
-      if (!linked)
-        issues.push(`- ${path2}: dead link [[${link}]]`);
-    }
-  }
-  return issues.join("\n");
-}
-function buildEntityTypesBlock3(domain) {
-  if (!domain.entity_types?.length)
-    return "";
-  return domain.entity_types.map((et) => `- ${et.type}: ${et.description}`).join("\n");
-}
-
-// src/phases/init.ts
-async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultName, skillPath, signal, opts = {}) {
-  const domainId = args[0];
-  const dryRun = args.includes("--dry-run");
-  if (!domainId) {
-    yield { kind: "error", message: "init: domain id required" };
-    return;
-  }
-  const existing = domains.find((d) => d.id === domainId);
-  if (existing) {
-    yield { kind: "error", message: `Domain "${domainId}" already exists in domain-map.` };
-    return;
-  }
-  yield { kind: "assistant_text", delta: `Bootstrapping domain "${domainId}"...
-` };
-  const start = Date.now();
-  const allFiles = await vaultTools.listFiles("");
-  const sampleFiles = allFiles.slice(0, 5);
-  const samples = await vaultTools.readAll(sampleFiles);
-  const wikiRootGuess = `!Wiki`;
-  const [schemaContent, indexContent] = await Promise.all([
-    tryRead3(vaultTools, `${wikiRootGuess}/_schema.md`),
-    tryRead3(vaultTools, `${wikiRootGuess}/_index.md`)
-  ]);
-  const systemContent = [
-    `\u0422\u044B \u2014 \u0430\u0440\u0445\u0438\u0442\u0435\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439. \u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u0443\u0439 \u0437\u0430\u043F\u0438\u0441\u044C \u0434\u043E\u043C\u0435\u043D\u0430 \u0434\u043B\u044F domain-map.json.`,
-    `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E \u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0439 \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u044B:`,
-    `{`,
-    `  "id": "${domainId}",`,
-    `  "name": "\u0427\u0435\u043B\u043E\u0432\u0435\u043A\u043E\u0447\u0438\u0442\u0430\u0435\u043C\u043E\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435",`,
-    `  "wiki_folder": "vaults/${vaultName}/!Wiki/${domainId}",`,
-    `  "source_paths": ["relative/source/path"],`,
-    `  "entity_types": [{"type":"...","description":"...","extraction_cues":["..."],"min_mentions_for_page":1,"wiki_subfolder":"${domainId}/..."}],`,
-    `  "language_notes": ""`,
-    `}`,
-    schemaContent ? `
-\u041A\u043E\u043D\u0432\u0435\u043D\u0446\u0438\u0438 \u0432\u0438\u043A\u0438 (_schema.md):
-${schemaContent.slice(0, 1500)}` : "",
-    indexContent ? `
-\u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0430\u044F \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430 (_index.md):
-${indexContent.slice(0, 1e3)}` : ""
-  ].filter(Boolean).join("\n");
-  const messages = [
-    { role: "system", content: systemContent },
-    {
-      role: "user",
-      content: [
-        `Domain ID: ${domainId}`,
-        `Vault name: ${vaultName}`,
-        "",
-        `\u041F\u0440\u0438\u043C\u0435\u0440\u044B \u0444\u0430\u0439\u043B\u043E\u0432 vault:`,
-        [...samples.entries()].map(([p, c]) => `${p}:
-${c.slice(0, 400)}`).join("\n\n")
-      ].join("\n")
-    }
-  ];
-  const params = buildChatParams(model, messages, opts);
-  let fullText = "";
-  try {
-    const stream = await llm.chat.completions.create(
-      { ...params, stream: true },
-      { signal }
-    );
-    for await (const chunk of stream) {
-      const { reasoning, content } = extractStreamDeltas(chunk);
-      if (reasoning)
-        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-      if (content) {
-        fullText += content;
-        yield { kind: "assistant_text", delta: content };
-      }
-    }
-  } catch (e) {
-    if (signal.aborted || e.name === "AbortError")
-      return;
-    const resp = await llm.chat.completions.create(
-      { ...params, stream: false }
-    );
-    fullText = resp.choices[0]?.message?.content ?? "";
-    if (fullText)
-      yield { kind: "assistant_text", delta: fullText };
-  }
-  if (signal.aborted)
-    return;
-  let entry;
-  try {
-    const match = fullText.match(/\{[\s\S]*\}/);
-    if (!match)
-      throw new Error("No JSON object found in LLM response");
-    entry = JSON.parse(match[0]);
-    if (!entry.id || !entry.wiki_folder)
-      throw new Error("Missing required fields");
-  } catch (e) {
-    yield { kind: "error", message: `Failed to parse domain entry: ${e.message}` };
-    return;
-  }
-  if (dryRun) {
-    yield {
-      kind: "result",
-      durationMs: Date.now() - start,
-      text: `Dry run \u2014 domain entry:
-\`\`\`json
-${JSON.stringify(entry, null, 2)}
-\`\`\``
-    };
-    return;
-  }
-  const dmPath = `${skillPath}/shared/domain-map-${vaultName}.json`;
-  yield { kind: "tool_use", name: "Write", input: { path: dmPath } };
-  try {
-    const { addDomain: addDomain2 } = await Promise.resolve().then(() => (init_domain_map(), domain_map_exports));
-    const result = addDomain2(skillPath, vaultName, repoRoot, {
-      id: entry.id,
-      name: entry.name ?? entry.id,
-      wikiFolder: entry.wiki_folder,
-      sourcePaths: entry.source_paths ?? []
-    });
-    if (!result.ok) {
-      yield { kind: "tool_result", ok: false, preview: result.error };
-      yield { kind: "error", message: result.error };
-      return;
-    }
-    yield { kind: "tool_result", ok: true };
-  } catch (e) {
-    yield { kind: "tool_result", ok: false, preview: e.message };
-    yield { kind: "error", message: e.message };
-    return;
-  }
-  await appendLog2(vaultTools, wikiRootGuess, domainId);
-  yield {
-    kind: "result",
-    durationMs: Date.now() - start,
-    text: `Domain "${domainId}" initialised. Edit domain-map to refine source_paths and entity_types.`
-  };
-}
-async function appendLog2(vaultTools, wikiRoot, domainId) {
-  const logPath = `${wikiRoot}/_log.md`;
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const entry = `
-## ${today} \u2014 init \u2014 ${domainId}
-- \u0414\u043E\u043C\u0435\u043D \u0441\u043E\u0437\u0434\u0430\u043D
-`;
-  try {
-    const existing = await tryRead3(vaultTools, logPath);
-    await vaultTools.write(logPath, existing + entry);
-  } catch {
-  }
-}
-async function tryRead3(vaultTools, path2) {
-  try {
-    return await vaultTools.read(path2);
-  } catch {
-    return "";
-  }
-}
-
-// src/agent-runner.ts
-var AgentRunner = class {
-  constructor(settings, vaultTools, vaultName, domains) {
-    this.settings = settings;
-    this.vaultTools = vaultTools;
-    this.vaultName = vaultName;
-    this.domains = domains;
-    this.llm = new OpenAI({
-      baseURL: settings.nativeAgent.baseUrl,
-      apiKey: settings.nativeAgent.apiKey,
-      timeout: settings.nativeAgent.requestTimeoutSec * 1e3,
-      dangerouslyAllowBrowser: true
-    });
-  }
-  llm;
-  _overrideLlm(llm) {
-    this.llm = llm;
-  }
-  buildOpts() {
-    const na = this.settings.nativeAgent;
-    return {
-      temperature: na.temperature,
-      maxTokens: na.maxTokens,
-      topP: na.topP,
-      systemPrompt: na.systemPrompt || void 0,
-      numCtx: na.numCtx
-    };
-  }
-  async *run(req) {
-    yield { kind: "system", message: `native-agent / ${this.settings.nativeAgent.model}` };
-    if (req.signal.aborted)
-      return;
-    const model = this.settings.nativeAgent.model;
-    const repoRoot = req.cwd ?? "";
-    const skillPath = this.settings.cwd;
-    const opts = this.buildOpts();
-    const domains = req.domainId ? this.domains.filter((d) => d.id === req.domainId) : this.domains;
-    switch (req.operation) {
-      case "ingest":
-        yield* runIngest(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
-        break;
-      case "query":
-        yield* runQuery(req.args, false, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
-        break;
-      case "query-save":
-        yield* runQuery(req.args, true, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
-        break;
-      case "lint":
-        yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
-        break;
-      case "init":
-        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, skillPath, req.signal, opts);
-        break;
-      default:
-        const start = Date.now();
-        yield { kind: "error", message: `Unknown operation: ${req.operation}` };
-        yield { kind: "result", durationMs: Date.now() - start, text: "" };
-        return;
-    }
-  }
-};
-
-// src/vault-tools.ts
-var VaultTools = class {
-  constructor(adapter, basePath) {
-    this.adapter = adapter;
-    this.basePath = basePath;
-  }
-  async read(vaultPath) {
-    return this.adapter.read(vaultPath);
-  }
-  async write(vaultPath, content) {
-    const dir = vaultPath.split("/").slice(0, -1).join("/");
-    if (dir) {
-      const dirExists = await this.adapter.exists(dir);
-      if (!dirExists)
-        await this.adapter.mkdir(dir);
-    }
-    await this.adapter.write(vaultPath, content);
-  }
-  async listFiles(vaultDir) {
-    const exists = await this.adapter.exists(vaultDir);
-    if (!exists)
-      return [];
-    return this._listRecursive(vaultDir);
-  }
-  async _listRecursive(vaultDir) {
-    const result = await this.adapter.list(vaultDir);
-    const deeper = await Promise.all(result.folders.map((f) => this._listRecursive(f)));
-    return [...result.files, ...deeper.flat()];
-  }
-  async readAll(paths) {
-    const entries = await Promise.all(
-      paths.map(async (p) => {
-        try {
-          return [p, await this.read(p)];
-        } catch {
-          return null;
-        }
-      })
-    );
-    return new Map(entries.filter((e) => e !== null));
-  }
-  async exists(vaultPath) {
-    return this.adapter.exists(vaultPath);
-  }
-  toVaultPath(absolutePath) {
-    const base = this.basePath.endsWith("/") ? this.basePath : this.basePath + "/";
-    if (!absolutePath.startsWith(base))
-      return null;
-    return absolutePath.slice(base.length);
-  }
-};
-
 // src/controller.ts
 var WikiController = class {
   constructor(app, plugin) {
@@ -9176,35 +9119,23 @@ var WikiController = class {
     this.plugin = plugin;
   }
   current = null;
-  /** Путь к папке навыка (для UI: проверка "задан ли путь"). */
-  cwdOrEmpty() {
-    return resolveSkillPath(this.plugin.settings) ?? "";
-  }
   isBusy() {
     return this.current !== null;
   }
   cancelCurrent() {
     if (this.current) {
       this.current.abort();
-      new import_obsidian4.Notice("Cancelling\u2026");
+      new import_obsidian4.Notice("\u041E\u0442\u043C\u0435\u043D\u0430\u2026");
     }
   }
   async ingestActive(domainId) {
     const file = this.app.workspace.getActiveFile();
     if (!file) {
-      new import_obsidian4.Notice("No active file");
+      new import_obsidian4.Notice("\u041D\u0435\u0442 \u0430\u043A\u0442\u0438\u0432\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u0430");
       return;
     }
     const abs = this.app.vault.adapter.getFullPath(file.path);
-    const spawnCwd = resolveCwd(this.plugin.settings);
-    let filePath;
-    if (spawnCwd) {
-      const rel = (0, import_node_path6.relative)(spawnCwd, abs);
-      filePath = rel.startsWith("..") || (0, import_node_path6.isAbsolute)(rel) ? abs : rel;
-    } else {
-      filePath = abs;
-    }
-    await this.dispatch("ingest", [filePath], domainId);
+    await this.dispatch("ingest", [abs], domainId);
   }
   async query(question, save, domainId) {
     if (!question.trim())
@@ -9222,75 +9153,47 @@ var WikiController = class {
   }
   resolveDomainMapDir() {
     const s = this.plugin.settings;
-    if (s.backend === "native-agent") {
-      if (s.nativeAgent.domainMapDir)
-        return s.nativeAgent.domainMapDir;
-      const base = this.app.vault.adapter.getBasePath?.() ?? "";
-      return (0, import_node_path6.join)(base, ".obsidian", "plugins", "llm-wiki");
-    }
-    return (0, import_node_path6.join)(resolveSkillPath(s) ?? "", "shared");
+    const dir = s.backend === "claude-agent" ? s.claudeAgent.domainMapDir : s.nativeAgent.domainMapDir;
+    if (dir)
+      return dir;
+    const base = this.app.vault.adapter.getBasePath?.() ?? "";
+    return (0, import_node_path5.join)(base, ".obsidian", "plugins", "llm-wiki");
   }
-  /** Список доменов из domain-map-<vault>.json. */
   loadDomains() {
-    if (this.plugin.settings.backend === "claude-code") {
-      const sp = resolveSkillPath(this.plugin.settings);
-      if (!sp)
-        return [];
-    }
     return readDomains(this.resolveDomainMapDir(), this.app.vault.getName());
   }
   registerDomain(input) {
-    if (this.plugin.settings.backend === "claude-code") {
-      const sp = this.requireSkillPath();
-      if (!sp)
-        return { ok: false, error: "skill path is not set" };
-    }
     const vaultBase = this.app.vault.adapter.getBasePath?.() ?? "";
-    const repoRoot = this.plugin.settings.backend === "native-agent" ? vaultBase : resolveCwd(this.plugin.settings) ?? "";
-    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), repoRoot, input);
+    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), vaultBase, input);
     if (r.ok)
-      new import_obsidian4.Notice(`Domain \xAB${input.id}\xBB added`);
+      new import_obsidian4.Notice(`\u0414\u043E\u043C\u0435\u043D \xAB${input.id}\xBB \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D`);
     else
-      new import_obsidian4.Notice(`Failed to add domain: ${r.error}`);
+      new import_obsidian4.Notice(`\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D: ${r.error}`);
     return r;
   }
-  requireSkillPath() {
-    const sp = resolveSkillPath(this.plugin.settings);
-    if (!sp) {
-      new import_obsidian4.Notice("Set the LLM Wiki skill path in settings");
-      return null;
-    }
-    if (!(0, import_node_fs2.existsSync)(sp)) {
-      new import_obsidian4.Notice(`Skill folder not found: ${sp}`);
-      return null;
-    }
-    return sp;
-  }
-  requireIclaude() {
-    const p = this.plugin.settings.iclaudePath;
-    if (!p) {
-      new import_obsidian4.Notice("Set the Claude Code path in settings");
-      return null;
-    }
-    if (!(0, import_node_fs2.existsSync)(p)) {
-      new import_obsidian4.Notice(`Claude Code not found: ${p}`);
-      return null;
-    }
-    try {
-      (0, import_node_fs2.statSync)(p);
-    } catch {
-      new import_obsidian4.Notice(`Claude Code unavailable: ${p}`);
+  requireClaudeAgent() {
+    const p = this.plugin.settings.claudeAgent.iclaudePath;
+    if (!p || !(0, import_node_fs2.existsSync)(p)) {
+      new import_obsidian4.Notice("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0443\u0442\u044C \u043A Claude Code \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445");
       return null;
     }
     return p;
   }
   buildAgentRunner() {
     const adapter = this.app.vault.adapter;
-    const basePath = this.app.vault.adapter.getBasePath?.() ?? "";
-    const vaultTools = new VaultTools(adapter, basePath);
+    const base = this.app.vault.adapter.getBasePath?.() ?? "";
+    const vaultTools = new VaultTools(adapter, base);
     const vaultName = this.app.vault.getName();
-    const domains = readDomains(this.resolveDomainMapDir(), vaultName);
-    return new AgentRunner(this.plugin.settings, vaultTools, vaultName, domains);
+    const domainMapDir = this.resolveDomainMapDir();
+    const domains = readDomains(domainMapDir, vaultName);
+    const s = this.plugin.settings;
+    const llm = s.backend === "claude-agent" ? new ClaudeCliClient(s.claudeAgent) : new OpenAI({
+      baseURL: s.nativeAgent.baseUrl,
+      apiKey: s.nativeAgent.apiKey,
+      timeout: s.nativeAgent.requestTimeoutSec * 1e3,
+      dangerouslyAllowBrowser: true
+    });
+    return new AgentRunner(llm, s, vaultTools, vaultName, domains, domainMapDir);
   }
   logEvent(sessionId, op, domainId, ev) {
     let logPath = this.plugin.settings.agentLogPath;
@@ -9299,7 +9202,7 @@ var WikiController = class {
     try {
       const stat = (0, import_node_fs2.existsSync)(logPath) ? (0, import_node_fs2.statSync)(logPath) : null;
       if (stat?.isDirectory() || !logPath.includes(".") && !logPath.endsWith("/")) {
-        logPath = (0, import_node_path6.join)(logPath, "agent.jsonl");
+        logPath = (0, import_node_path5.join)(logPath, "agent.jsonl");
       }
       const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), session: sessionId, op, domainId, event: ev }) + "\n";
       (0, import_node_fs2.appendFileSync)(logPath, line, "utf-8");
@@ -9308,20 +9211,17 @@ var WikiController = class {
   }
   async dispatch(op, args, domainId) {
     if (this.isBusy()) {
-      new import_obsidian4.Notice("Operation in progress, cancel it first");
+      new import_obsidian4.Notice("\u0423\u0436\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F, \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u0435 \u0435\u0451 \u0441\u043D\u0430\u0447\u0430\u043B\u0430");
       return;
     }
-    if (this.plugin.settings.backend === "claude-code" && !this.requireSkillPath())
+    if (this.plugin.settings.backend === "claude-agent" && !this.requireClaudeAgent())
       return;
-    let iclaudePath = null;
-    if (this.plugin.settings.backend !== "native-agent") {
-      iclaudePath = this.requireIclaude();
-      if (!iclaudePath)
-        return;
-    }
     await this.ensureView();
     const view = this.activeView();
     if (!view)
+      return;
+    const agentRunner = this.buildAgentRunner();
+    if (!agentRunner)
       return;
     const ctrl = new AbortController();
     this.current = ctrl;
@@ -9332,43 +9232,14 @@ var WikiController = class {
     let status = "done";
     this.logEvent(sessionId, op, domainId, { kind: "system", message: `start op=${op} args=${JSON.stringify(args)} domainId=${domainId ?? ""}` });
     view.setRunning(op, args);
-    const spawnCwd = resolveCwd(this.plugin.settings) ?? void 0;
+    const vaultBasePath = this.app.vault.adapter.getBasePath?.() ?? "";
+    const vaultName = this.app.vault.getName();
+    const vaultSuffix = `/vaults/${vaultName}`;
+    const repoRoot = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1e3;
-    let claudeRunner = null;
-    let runGen;
-    if (this.plugin.settings.backend === "native-agent") {
-      const agentRunner = this.buildAgentRunner();
-      if (!agentRunner)
-        return;
-      const vaultBasePath = this.app.vault.adapter.getBasePath?.() ?? spawnCwd ?? "";
-      const vaultName = this.app.vault.getName();
-      const vaultSuffix = `/vaults/${vaultName}`;
-      const repoRootForAgent = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
-      runGen = agentRunner.run({ operation: op, args, cwd: repoRootForAgent, signal: ctrl.signal, timeoutMs, domainId });
-    } else {
-      claudeRunner = new IclaudeRunner({
-        iclaudePath,
-        allowedTools: this.plugin.settings.allowedTools,
-        model: this.plugin.settings.model
-      });
-      runGen = claudeRunner.run({ operation: op, args, cwd: spawnCwd, signal: ctrl.signal, timeoutMs });
-    }
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
     try {
       for await (const ev of runGen) {
-        if (ev.kind === "ask_user") {
-          view.appendEvent(ev);
-          if (claudeRunner) {
-            try {
-              const answer = await view.showQuestionModal(ev.question, ev.options);
-              if (!claudeRunner.sendToolResult(ev.toolUseId, answer)) {
-                ctrl.abort();
-              }
-            } catch {
-              ctrl.abort();
-            }
-          }
-          continue;
-        }
         this.logEvent(sessionId, op, domainId, ev);
         view.appendEvent(ev);
         this.collectStep(ev, steps);
@@ -9385,7 +9256,7 @@ var WikiController = class {
       }
     } catch (err) {
       status = "error";
-      finalText = `Error: ${err.message}`;
+      finalText = `\u041E\u0448\u0438\u0431\u043A\u0430: ${err.message}`;
       this.logEvent(sessionId, op, domainId, { kind: "error", message: finalText });
     } finally {
       this.current = null;
@@ -9410,7 +9281,7 @@ var WikiController = class {
     if (op === "query-save" && status === "done") {
       const m = finalText.match(/Создана\s+страница:\s*([^\s`'"]+)/i);
       if (m) {
-        const pathInVault = await this.toVaultPath(spawnCwd, m[1]);
+        const pathInVault = await this.toVaultPath(vaultBasePath, m[1]);
         if (pathInVault)
           await this.app.workspace.openLinkText(pathInVault, "");
       }
@@ -9439,11 +9310,10 @@ var WikiController = class {
     const view = leaves[0]?.view;
     return view instanceof LlmWikiView ? view : null;
   }
-  toVaultPath(spawnCwd, savedPath) {
-    const vaultDir = this.app.vault.adapter.getBasePath?.() ?? "";
-    const abs = (0, import_node_path6.isAbsolute)(savedPath) ? savedPath : (0, import_node_path6.join)(spawnCwd ?? vaultDir, savedPath);
-    const rel = (0, import_node_path6.relative)(vaultDir, abs);
-    if (rel.startsWith("..") || (0, import_node_path6.isAbsolute)(rel))
+  async toVaultPath(vaultDir, savedPath) {
+    const abs = (0, import_node_path5.isAbsolute)(savedPath) ? savedPath : (0, import_node_path5.join)(vaultDir, savedPath);
+    const rel = (0, import_node_path5.relative)(vaultDir, abs);
+    if (rel.startsWith("..") || (0, import_node_path5.isAbsolute)(rel))
       return null;
     const file = this.app.vault.getAbstractFileByPath(rel);
     return file instanceof import_obsidian4.TFile ? rel : rel;
@@ -9541,9 +9411,20 @@ var LlmWikiPlugin = class extends import_obsidian5.Plugin {
       ...data ?? {},
       timeouts: { ...DEFAULT_SETTINGS.timeouts, ...data?.timeouts ?? {} },
       nativeAgent: { ...DEFAULT_SETTINGS.nativeAgent, ...data?.nativeAgent ?? {} },
-      allowedTools: data?.allowedTools ?? DEFAULT_SETTINGS.allowedTools,
+      claudeAgent: { ...DEFAULT_SETTINGS.claudeAgent, ...data?.claudeAgent ?? {} },
       history: data?.history ?? []
     };
+    if (data?.backend === "claude-code" || !this.settings.claudeAgent.iclaudePath) {
+      if (data?.backend === "claude-code") {
+        this.settings.backend = "claude-agent";
+      }
+      if (data?.iclaudePath && !this.settings.claudeAgent.iclaudePath) {
+        this.settings.claudeAgent.iclaudePath = data.iclaudePath;
+      }
+      if (data?.model && !this.settings.claudeAgent.model) {
+        this.settings.claudeAgent.model = data.model;
+      }
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);
