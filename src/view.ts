@@ -252,6 +252,9 @@ export class LlmWikiView extends ItemView {
       if (ev.isReasoning) {
         if (!this.reasoningBlock) {
           this.reasoningBlock = this.stepsEl.createDiv("llm-wiki-step reasoning");
+          if (this.assistantBlock) {
+            this.stepsEl.insertBefore(this.reasoningBlock, this.assistantBlock);
+          }
           this.reasoningBlock.createSpan({ cls: "llm-wiki-step-icon" }).setText("🧠");
           this.reasoningBlock.createSpan({ cls: "llm-wiki-reasoning-text" });
         }
