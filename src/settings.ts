@@ -105,7 +105,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName("Папка domain-map")
-        .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/llm-wiki/")
+        .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/obsidian-llm-wiki/")
         .addText((t) =>
           t
             .setPlaceholder("(авто)")
@@ -258,7 +258,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName("Папка domain-map")
-        .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/llm-wiki/")
+        .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/obsidian-llm-wiki/")
         .addText((t) =>
           t
             .setPlaceholder("(авто)")

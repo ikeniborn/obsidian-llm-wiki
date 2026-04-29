@@ -53,7 +53,7 @@ export class WikiController {
       : s.nativeAgent.domainMapDir;
     if (dir) return dir;
     const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    return join(base, ".obsidian", "plugins", "llm-wiki");
+    return join(base, ".obsidian", "plugins", "obsidian-llm-wiki");
   }
 
   loadDomains(): DomainEntry[] {
