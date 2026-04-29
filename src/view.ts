@@ -15,6 +15,9 @@ export class LlmWikiView extends ItemView {
   private state: ViewState = "idle";
   private stepsEl!: HTMLElement;
   private finalEl!: HTMLElement;
+  private resultSection!: HTMLElement;
+  private resultToggle!: HTMLElement;
+  private resultOpen = false;
   private historyEl!: HTMLElement;
   private statusEl!: HTMLElement;
   private progressToggle!: HTMLElement;
@@ -133,8 +136,13 @@ export class LlmWikiView extends ItemView {
     this.stepsEl = root.createDiv("llm-wiki-steps");
     this.stepsEl.addClass("llm-wiki-hidden");
 
-    root.createEl("h4", { text: T.view.result });
-    this.finalEl = root.createDiv("llm-wiki-final");
+    this.resultSection = root.createDiv("llm-wiki-result-section llm-wiki-hidden");
+    const resultHeader = this.resultSection.createDiv("llm-wiki-progress-header");
+    const resultH4 = resultHeader.createEl("h4", { cls: "llm-wiki-progress-title" });
+    this.resultToggle = resultH4.createSpan({ cls: "llm-wiki-progress-arrow", text: "▶" });
+    resultH4.appendText(` ${T.view.result}`);
+    resultHeader.addEventListener("click", () => this.toggleResult());
+    this.finalEl = this.resultSection.createDiv("llm-wiki-final llm-wiki-hidden");
 
     root.createEl("h4", { text: T.view.history });
     this.historyEl = root.createDiv("llm-wiki-history");
@@ -196,6 +204,10 @@ export class LlmWikiView extends ItemView {
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
     this.initBtn.disabled = true;
+
+    this.resultSection.addClass("llm-wiki-hidden");
+    this.finalEl.empty();
+    this.resultOpen = false;
 
     this.startTs = Date.now();
     this.toolCount = 0;
@@ -308,8 +320,22 @@ export class LlmWikiView extends ItemView {
       const comp = new Component();
       comp.load();
       await MarkdownRenderer.render(this.app, entry.finalText, this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
+      this.resultSection.removeClass("llm-wiki-hidden");
+      this.finalEl.removeClass("llm-wiki-hidden");
+      this.resultOpen = true;
+      this.resultToggle.setText("▼");
     }
     this.renderHistory();
+  }
+
+  private toggleResult(): void {
+    this.resultOpen = !this.resultOpen;
+    if (this.resultOpen) {
+      this.finalEl.removeClass("llm-wiki-hidden");
+    } else {
+      this.finalEl.addClass("llm-wiki-hidden");
+    }
+    this.resultToggle.setText(this.resultOpen ? "▼" : "▶");
   }
 
   private toggleSteps(): void {
@@ -357,6 +383,10 @@ export class LlmWikiView extends ItemView {
         const comp = new Component();
         comp.load();
         void MarkdownRenderer.render(this.app, it.finalText || "(empty)", this.finalEl, this.plugin.controller.cwdOrEmpty(), comp);
+        this.resultSection.removeClass("llm-wiki-hidden");
+        this.finalEl.removeClass("llm-wiki-hidden");
+        this.resultOpen = true;
+        this.resultToggle.setText("▼");
       });
     }
     if (items.length === 0) {
