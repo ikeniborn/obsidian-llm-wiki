@@ -99,6 +99,16 @@ export default class LlmWikiPlugin extends Plugin {
       history: (data?.history as RunHistoryEntry[]) ?? [],
     } as LlmWikiPluginSettings;
 
+    // Миграция: поля, перенесённые с per-backend уровня на top-level (schema v2)
+    const caData = (data?.claudeAgent as Record<string, unknown>) ?? {};
+    const naData = (data?.nativeAgent as Record<string, unknown>) ?? {};
+    if (!data?.systemPrompt && (caData.systemPrompt || naData.systemPrompt))
+      this.settings.systemPrompt = (caData.systemPrompt ?? naData.systemPrompt) as string;
+    if (!data?.domainMapDir && (caData.domainMapDir || naData.domainMapDir))
+      this.settings.domainMapDir = (caData.domainMapDir ?? naData.domainMapDir) as string;
+    if (!data?.maxTokens && (caData.maxTokens || naData.maxTokens))
+      this.settings.maxTokens = (caData.maxTokens ?? naData.maxTokens) as number;
+
     // Миграция с claude-code backend
     if ((data?.backend as string) === "claude-code") {
       this.settings.backend = "claude-agent";
