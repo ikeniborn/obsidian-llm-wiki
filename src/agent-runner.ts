@@ -3,7 +3,7 @@ import { runIngest } from "./phases/ingest";
 import { runQuery } from "./phases/query";
 import { runLint } from "./phases/lint";
 import { runInit } from "./phases/init";
-import type { LlmCallOptions, LlmClient, LlmWikiPluginSettings, RunEvent, RunRequest } from "./types";
+import type { LlmCallOptions, LlmClient, LlmWikiPluginSettings, OpKey, RunEvent, RunRequest } from "./types";
 import type { VaultTools } from "./vault-tools";
 
 export class AgentRunner {
@@ -16,32 +16,33 @@ export class AgentRunner {
     private domainMapDir: string = "",
   ) {}
 
-  private buildOpts(): LlmCallOptions {
-    const systemPrompt = this.settings.systemPrompt || undefined;
-    const maxTokens = this.settings.maxTokens;
-    if (this.settings.backend === "claude-agent") {
-      return { maxTokens, systemPrompt };
+  private buildOptsFor(op: RunRequest["operation"]): { model: string; opts: LlmCallOptions } {
+    const key = (op === "query-save" ? "query" : op) as OpKey;
+    const s = this.settings;
+
+    if (s.backend === "claude-agent") {
+      if (s.claudeAgent.perOperation) {
+        const c = s.claudeAgent.operations[key];
+        return { model: c.model, opts: { maxTokens: c.maxTokens, systemPrompt: s.systemPrompt } };
+      }
+      return { model: s.claudeAgent.model, opts: { maxTokens: s.maxTokens, systemPrompt: s.systemPrompt } };
     }
-    const na = this.settings.nativeAgent;
-    return { temperature: na.temperature, maxTokens, topP: na.topP, systemPrompt, numCtx: na.numCtx };
+
+    const na = s.nativeAgent;
+    if (na.perOperation) {
+      const c = na.operations[key];
+      return { model: c.model, opts: { maxTokens: c.maxTokens, temperature: c.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
+    }
+    return { model: na.model, opts: { maxTokens: s.maxTokens, temperature: na.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
   }
 
   async *run(req: RunRequest): AsyncGenerator<RunEvent, void, void> {
-    const modelLabel =
-      this.settings.backend === "claude-agent"
-        ? this.settings.claudeAgent.model || "claude"
-        : this.settings.nativeAgent.model;
-    yield { kind: "system", message: `${this.settings.backend} / ${modelLabel}` };
+    const { model, opts } = this.buildOptsFor(req.operation);
+    yield { kind: "system", message: `${this.settings.backend} / ${model || "claude"}` };
 
     if (req.signal.aborted) return;
 
-    const model =
-      this.settings.backend === "claude-agent"
-        ? this.settings.claudeAgent.model
-        : this.settings.nativeAgent.model;
     const repoRoot = req.cwd ?? "";
-    const opts = this.buildOpts();
-
     const domains = req.domainId
       ? this.domains.filter((d) => d.id === req.domainId)
       : this.domains;
