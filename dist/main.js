@@ -522,11 +522,10 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
     containerEl.empty();
     const s = this.plugin.settings;
     const T = i18n();
-    containerEl.createEl("h2", { text: "LLM Wiki" });
-    containerEl.createEl("h3", { text: T.settings.h3_general });
+    new import_obsidian2.Setting(containerEl).setName("LLM Wiki").setHeading();
+    new import_obsidian2.Setting(containerEl).setName(T.settings.h3_general).setHeading();
     new import_obsidian2.Setting(containerEl).setName(T.settings.systemPrompt_name).setDesc(T.settings.systemPrompt_desc).addTextArea((t) => {
-      t.inputEl.style.minHeight = "96px";
-      t.inputEl.style.width = "100%";
+      t.inputEl.addClass("llm-wiki-settings-textarea");
       t.setValue(s.systemPrompt).onChange(async (v) => {
         s.systemPrompt = v;
         await this.plugin.saveSettings();
@@ -575,7 +574,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: T.settings.h3_backend });
+    new import_obsidian2.Setting(containerEl).setName(T.settings.h3_backend).setHeading();
     new import_obsidian2.Setting(containerEl).setName(T.settings.backend_name).setDesc(T.settings.backend_desc).addDropdown(
       (d) => d.addOption("claude-agent", T.settings.claudeCodeAgent).addOption("native-agent", T.settings.nativeAgent).setValue(s.backend).onChange(async (v) => {
         s.backend = v;
@@ -613,7 +612,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           { key: "init", label: T.settings.op_init }
         ];
         for (const { key, label } of ops) {
-          containerEl.createEl("h5", { text: label });
+          new import_obsidian2.Setting(containerEl).setName(label).setHeading();
           new import_obsidian2.Setting(containerEl).setName(T.settings.opModel_name).setDesc(T.settings.opModel_desc).addText(
             (t) => t.setValue(s.claudeAgent.operations[key].model).onChange(async (v) => {
               s.claudeAgent.operations[key].model = v.trim();
@@ -676,7 +675,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           { key: "init", label: T.settings.op_init }
         ];
         for (const { key, label } of ops) {
-          containerEl.createEl("h5", { text: label });
+          new import_obsidian2.Setting(containerEl).setName(label).setHeading();
           new import_obsidian2.Setting(containerEl).setName(T.settings.opModel_name).setDesc(T.settings.opModel_desc).addText(
             (t) => t.setValue(s.nativeAgent.operations[key].model).onChange(async (v) => {
               s.nativeAgent.operations[key].model = v.trim();
@@ -995,7 +994,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       new ConfirmModal(this.plugin.app, "Lint \u2014 confirm", [
         `Domain: ${domainLabel}`,
         "Claude will check wiki pages for quality standards."
-      ], () => this.plugin.controller.lint(d || "all")).open();
+      ], () => void this.plugin.controller.lint(d || "all")).open();
     });
     this.initBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
@@ -1006,7 +1005,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       new ConfirmModal(this.plugin.app, "Init \u2014 confirm", [
         `Domain: \xAB${d}\xBB`,
         "Claude will create the folder structure and base wiki pages for the domain."
-      ], () => this.plugin.controller.init(d, false)).open();
+      ], () => void this.plugin.controller.init(d, false)).open();
     });
     this.refreshDomains();
     const ask = root.createDiv("llm-wiki-ask");
@@ -9628,7 +9627,7 @@ var WikiController = class {
     if (s.domainMapDir)
       return s.domainMapDir;
     const base = this.app.vault.adapter.getBasePath?.() ?? "";
-    return (0, import_node_path5.join)(base, ".obsidian", "plugins", "obsidian-llm-wiki");
+    return (0, import_node_path5.join)(base, this.app.vault.configDir, "plugins", "obsidian-llm-wiki");
   }
   cwdOrEmpty() {
     return this.app.vault.adapter.getBasePath?.() ?? "";
@@ -9754,7 +9753,7 @@ var WikiController = class {
     if (op === "query-save" && status === "done") {
       const m = finalText.match(/Создана\s+страница:\s*([^\s`'"]+)/i);
       if (m) {
-        const pathInVault = await this.toVaultPath(vaultBasePath, m[1]);
+        const pathInVault = this.toVaultPath(vaultBasePath, m[1]);
         if (pathInVault)
           await this.app.workspace.openLinkText(pathInVault, "");
       }
@@ -9783,13 +9782,12 @@ var WikiController = class {
     const view = leaves[0]?.view;
     return view instanceof LlmWikiView ? view : null;
   }
-  async toVaultPath(vaultDir, savedPath) {
+  toVaultPath(vaultDir, savedPath) {
     const abs = (0, import_node_path5.isAbsolute)(savedPath) ? savedPath : (0, import_node_path5.join)(vaultDir, savedPath);
     const rel = (0, import_node_path5.relative)(vaultDir, abs);
     if (rel.startsWith("..") || (0, import_node_path5.isAbsolute)(rel))
       return null;
-    const file = this.app.vault.getAbstractFileByPath(rel);
-    return file instanceof import_obsidian5.TFile ? rel : rel;
+    return rel;
   }
 };
 
@@ -9874,7 +9872,7 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
     this.addSettingTab(new LlmWikiSettingTab(this.app, this));
     console.debug("[llm-wiki] loaded");
   }
-  async onunload() {
+  onunload() {
     this.controller.cancelCurrent();
     console.debug("[llm-wiki] unloaded");
   }

@@ -1,4 +1,4 @@
-import { App, Notice, TFile } from "obsidian";
+import { App, Notice } from "obsidian";
 import { existsSync, appendFileSync, statSync } from "node:fs";
 import { relative, isAbsolute, join } from "node:path";
 import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
@@ -37,7 +37,7 @@ export class WikiController {
     await this.dispatch(op, [question.trim()], domainId);
   }
 
-  async lint(domain: string | "all"): Promise<void> {
+  async lint(domain: string): Promise<void> {
     const args = domain === "all" ? [] : [domain];
     await this.dispatch("lint", args);
   }
@@ -51,7 +51,7 @@ export class WikiController {
     const s = this.plugin.settings;
     if (s.domainMapDir) return s.domainMapDir;
     const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    return join(base, ".obsidian", "plugins", "obsidian-llm-wiki");
+    return join(base, this.app.vault.configDir, "plugins", "obsidian-llm-wiki");
   }
 
   cwdOrEmpty(): string {
@@ -191,7 +191,7 @@ export class WikiController {
     if (op === "query-save" && status === "done") {
       const m = finalText.match(/Создана\s+страница:\s*([^\s`'"]+)/i);
       if (m) {
-        const pathInVault = await this.toVaultPath(vaultBasePath, m[1]);
+        const pathInVault = this.toVaultPath(vaultBasePath, m[1]);
         if (pathInVault) await this.app.workspace.openLinkText(pathInVault, "");
       }
     }
@@ -222,11 +222,10 @@ export class WikiController {
     return view instanceof LlmWikiView ? view : null;
   }
 
-  private async toVaultPath(vaultDir: string, savedPath: string): Promise<string | null> {
+  private toVaultPath(vaultDir: string, savedPath: string): string | null {
     const abs = isAbsolute(savedPath) ? savedPath : join(vaultDir, savedPath);
     const rel = relative(vaultDir, abs);
     if (rel.startsWith("..") || isAbsolute(rel)) return null;
-    const file = this.app.vault.getAbstractFileByPath(rel);
-    return file instanceof TFile ? rel : rel;
+    return rel;
   }
 }

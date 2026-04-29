@@ -1,4 +1,3 @@
-import { isAbsolute, join } from "node:path";
 import type OpenAI from "openai";
 import type { DomainEntry } from "../domain-map";
 import type { LlmCallOptions, RunEvent, LlmClient } from "../types";

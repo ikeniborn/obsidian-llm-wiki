@@ -86,7 +86,7 @@ export default class LlmWikiPlugin extends Plugin {
     console.debug("[llm-wiki] loaded");
   }
 
-  async onunload(): Promise<void> {
+  onunload(): void {
     this.controller.cancelCurrent();
     console.debug("[llm-wiki] unloaded");
   }

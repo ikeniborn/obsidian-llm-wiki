@@ -62,7 +62,7 @@ export class DomainModal extends Modal {
     private allowAll: boolean,
     private extra: { dryRun?: boolean } | null,
     private domains: DomainEntry[],
-    private onSubmit: (domain: string | "all", flags: { dryRun?: boolean }) => void,
+    private onSubmit: (domain: string, flags: { dryRun?: boolean }) => void,
   ) {
     super(app);
   }
@@ -70,7 +70,7 @@ export class DomainModal extends Modal {
     const T = i18n().modal;
     const { contentEl } = this;
     contentEl.createEl("h3", { text: this.title });
-    let domain: string | "all" = this.allowAll ? "all" : (this.domains[0]?.id ?? "");
+    let domain: string = this.allowAll ? "all" : (this.domains[0]?.id ?? "");
     let dryRun = false;
 
     if (this.domains.length === 0) {

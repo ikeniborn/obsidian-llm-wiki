@@ -67,3 +67,8 @@
 .llm-wiki-hidden {
   display: none;
 }
+
+.llm-wiki-settings-textarea {
+  min-height: 96px;
+  width: 100%;
+}

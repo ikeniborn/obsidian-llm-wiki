@@ -14,17 +14,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
     const T = i18n();
 
-    containerEl.createEl("h2", { text: "LLM Wiki" });
+    new Setting(containerEl).setName("LLM Wiki").setHeading();
 
     // ── General settings ───────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: T.settings.h3_general });
+    new Setting(containerEl).setName(T.settings.h3_general).setHeading();
 
     new Setting(containerEl)
       .setName(T.settings.systemPrompt_name)
       .setDesc(T.settings.systemPrompt_desc)
       .addTextArea((t) => {
-        t.inputEl.style.minHeight = "96px";
-        t.inputEl.style.width = "100%";
+        t.inputEl.addClass("llm-wiki-settings-textarea");
         t.setValue(s.systemPrompt)
           .onChange(async (v) => { s.systemPrompt = v; await this.plugin.saveSettings(); });
         return t;
@@ -89,7 +88,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       );
 
     // ── Backend settings ───────────────────────────────────────────────────
-    containerEl.createEl("h3", { text: T.settings.h3_backend });
+    new Setting(containerEl).setName(T.settings.h3_backend).setHeading();
 
     new Setting(containerEl)
       .setName(T.settings.backend_name)
@@ -142,7 +141,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           { key: "init",   label: T.settings.op_init },
         ];
         for (const { key, label } of ops) {
-          containerEl.createEl("h5", { text: label });
+          new Setting(containerEl).setName(label).setHeading();
           new Setting(containerEl)
             .setName(T.settings.opModel_name)
             .setDesc(T.settings.opModel_desc)
@@ -220,7 +219,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           { key: "init",   label: T.settings.op_init },
         ];
         for (const { key, label } of ops) {
-          containerEl.createEl("h5", { text: label });
+          new Setting(containerEl).setName(label).setHeading();
           new Setting(containerEl)
             .setName(T.settings.opModel_name)
             .setDesc(T.settings.opModel_desc)

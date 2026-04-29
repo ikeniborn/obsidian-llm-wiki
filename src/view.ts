@@ -93,7 +93,7 @@ export class LlmWikiView extends ItemView {
       new ConfirmModal(this.plugin.app, "Lint — confirm", [
         `Domain: ${domainLabel}`,
         "Claude will check wiki pages for quality standards.",
-      ], () => this.plugin.controller.lint(d || "all")).open();
+      ], () => void this.plugin.controller.lint(d || "all")).open();
     });
     this.initBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
@@ -101,7 +101,7 @@ export class LlmWikiView extends ItemView {
       new ConfirmModal(this.plugin.app, "Init — confirm", [
         `Domain: «${d}»`,
         "Claude will create the folder structure and base wiki pages for the domain.",
-      ], () => this.plugin.controller.init(d, false)).open();
+      ], () => void this.plugin.controller.init(d, false)).open();
     });
 
     this.refreshDomains();
