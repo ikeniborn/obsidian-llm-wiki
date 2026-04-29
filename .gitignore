@@ -4,3 +4,4 @@ main.js
 .vitest-cache/
 !dist/main.js
 /tmp/
+.playwright-mcp
