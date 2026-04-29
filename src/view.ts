@@ -121,13 +121,6 @@ export class LlmWikiView extends ItemView {
     this.askBtn.addEventListener("click", () => this.submitQuery(false));
     this.askSaveBtn.addEventListener("click", () => this.submitQuery(true));
     this.cancelBtn.addEventListener("click", () => this.plugin.controller.cancelCurrent());
-    this.queryInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.submitQuery(e.shiftKey);
-      }
-    });
 
     const progressHeader = root.createDiv("llm-wiki-progress-header");
     const progressH4 = progressHeader.createEl("h4", { cls: "llm-wiki-progress-title" });
