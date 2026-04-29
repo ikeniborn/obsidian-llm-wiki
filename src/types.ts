@@ -66,6 +66,8 @@ export type LlmClient = {
 export interface LlmWikiPluginSettings {
   backend: "claude-agent" | "native-agent";
   systemPrompt: string;
+  domainMapDir: string;
+  maxTokens: number;
   agentLogPath: string;
   historyLimit: number;
   timeouts: {
@@ -78,26 +80,22 @@ export interface LlmWikiPluginSettings {
   claudeAgent: {
     iclaudePath: string;
     model: string;
-    domainMapDir: string;
-    maxTokens: number;
-    requestTimeoutSec: number;
   };
   nativeAgent: {
     baseUrl: string;
     apiKey: string;
     model: string;
     temperature: number;
-    maxTokens: number;
-    requestTimeoutSec: number;
     topP: number | null;
     numCtx: number | null;
-    domainMapDir: string;
   };
 }
 
 export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   backend: "claude-agent",
   systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
+  domainMapDir: "",
+  maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
   timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
@@ -105,19 +103,13 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   claudeAgent: {
     iclaudePath: "",
     model: "sonnet",
-    domainMapDir: "",
-    maxTokens: 4096,
-    requestTimeoutSec: 300,
   },
   nativeAgent: {
     baseUrl: "http://localhost:11434/v1",
     apiKey: "ollama",
     model: "llama3.2",
     temperature: 0.2,
-    maxTokens: 4096,
-    requestTimeoutSec: 300,
     topP: null,
     numCtx: null,
-    domainMapDir: "",
   },
 };

@@ -18,12 +18,12 @@ export class AgentRunner {
 
   private buildOpts(): LlmCallOptions {
     const systemPrompt = this.settings.systemPrompt || undefined;
+    const maxTokens = this.settings.maxTokens;
     if (this.settings.backend === "claude-agent") {
-      const ca = this.settings.claudeAgent;
-      return { maxTokens: ca.maxTokens, systemPrompt };
+      return { maxTokens, systemPrompt };
     }
     const na = this.settings.nativeAgent;
-    return { temperature: na.temperature, maxTokens: na.maxTokens, topP: na.topP, systemPrompt, numCtx: na.numCtx };
+    return { temperature: na.temperature, maxTokens, topP: na.topP, systemPrompt, numCtx: na.numCtx };
   }
 
   async *run(req: RunRequest): AsyncGenerator<RunEvent, void, void> {

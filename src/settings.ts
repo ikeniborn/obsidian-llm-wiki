@@ -14,6 +14,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "LLM Wiki" });
 
+    // ── Общие настройки ────────────────────────────────────────────────────
     containerEl.createEl("h3", { text: "Общие настройки" });
 
     new Setting(containerEl)
@@ -32,6 +33,73 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Max tokens")
+      .setDesc("Максимум токенов в ответе. Рекомендуется ≥ 4096.")
+      .addText((t) =>
+        t
+          .setPlaceholder("4096")
+          .setValue(String(s.maxTokens))
+          .onChange(async (v) => {
+            const n = Number(v);
+            if (Number.isFinite(n) && n > 0) {
+              s.maxTokens = Math.floor(n);
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Папка domain-map")
+      .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/obsidian-llm-wiki/")
+      .addText((t) =>
+        t
+          .setPlaceholder("(авто)")
+          .setValue(s.domainMapDir)
+          .onChange(async (v) => {
+            s.domainMapDir = v.trim();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Таймауты (секунды)")
+      .setDesc("ingest / query / lint / init")
+      .addText((t) =>
+        t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`)
+          .onChange(async (v) => {
+            const parts = v.split("/").map((x) => Number(x.trim()));
+            if (parts.length === 4 && parts.every((n) => Number.isFinite(n) && n > 0)) {
+              s.timeouts = { ingest: parts[0], query: parts[1], lint: parts[2], init: parts[3] };
+              await this.plugin.saveSettings();
+            }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Лимит истории")
+      .setDesc("Максимум операций в истории боковой панели.")
+      .addText((t) =>
+        t.setValue(String(s.historyLimit))
+          .onChange(async (v) => {
+            const n = Number(v);
+            if (Number.isFinite(n) && n > 0) { s.historyLimit = Math.floor(n); await this.plugin.saveSettings(); }
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Лог агента (JSONL)")
+      .setDesc("Абсолютный путь к файлу лога. Пусто — отключено.")
+      .addText((t) =>
+        t
+          .setPlaceholder("/tmp/llm-wiki-agent.jsonl")
+          .setValue(s.agentLogPath)
+          .onChange(async (v) => { s.agentLogPath = v.trim(); await this.plugin.saveSettings(); }),
+      );
+
+    // ── Настройки бэкенда ──────────────────────────────────────────────────
+    containerEl.createEl("h3", { text: "Настройки бэкенда" });
+
+    new Setting(containerEl)
       .setName("Backend")
       .setDesc("Выберите бэкенд для выполнения операций.")
       .addDropdown((d) =>
@@ -45,8 +113,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
             this.display();
           }),
       );
-
-    containerEl.createEl("h3", { text: "Настройки бэкенда" });
 
     if (s.backend === "claude-agent") {
       new Setting(containerEl)
@@ -64,7 +130,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setName("Модель")
-        .setDesc("Имя модели: sonnet, opus, claude-sonnet-4-6 и т.п. Пусто — дефолт claude.")
+        .setDesc("Имя модели: sonnet, opus, claude-sonnet-4-6 и т.п.")
         .addText((t) =>
           t
             .setPlaceholder("sonnet")
@@ -75,50 +141,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
             }),
         );
 
-      new Setting(containerEl)
-        .setName("Max tokens")
-        .setDesc("Максимум токенов в ответе. Рекомендуется ≥ 4096.")
-        .addText((t) =>
-          t
-            .setPlaceholder("4096")
-            .setValue(String(s.claudeAgent.maxTokens))
-            .onChange(async (v) => {
-              const n = Number(v);
-              if (Number.isFinite(n) && n > 0) {
-                s.claudeAgent.maxTokens = Math.floor(n);
-                await this.plugin.saveSettings();
-              }
-            }),
-        );
-
-      new Setting(containerEl)
-        .setName("Request timeout (сек)")
-        .setDesc("Таймаут subprocess. Рекомендуется 300+.")
-        .addText((t) =>
-          t
-            .setPlaceholder("300")
-            .setValue(String(s.claudeAgent.requestTimeoutSec))
-            .onChange(async (v) => {
-              const n = Number(v);
-              if (Number.isFinite(n) && n > 0) {
-                s.claudeAgent.requestTimeoutSec = Math.floor(n);
-                await this.plugin.saveSettings();
-              }
-            }),
-        );
-
-      new Setting(containerEl)
-        .setName("Папка domain-map")
-        .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/obsidian-llm-wiki/")
-        .addText((t) =>
-          t
-            .setPlaceholder("(авто)")
-            .setValue(s.claudeAgent.domainMapDir)
-            .onChange(async (v) => {
-              s.claudeAgent.domainMapDir = v.trim();
-              await this.plugin.saveSettings();
-            }),
-        );
     } else {
       new Setting(containerEl)
         .setName("Base URL")
@@ -176,22 +198,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("Max tokens")
-        .setDesc("Максимум токенов в ответе.")
-        .addText((t) =>
-          t
-            .setPlaceholder("4096")
-            .setValue(String(s.nativeAgent.maxTokens))
-            .onChange(async (v) => {
-              const n = Number(v);
-              if (Number.isFinite(n) && n > 0) {
-                s.nativeAgent.maxTokens = Math.floor(n);
-                await this.plugin.saveSettings();
-              }
-            }),
-        );
-
-      new Setting(containerEl)
         .setName("Top-p")
         .setDesc("0.0–1.0, или пусто — отключить.")
         .addText((t) =>
@@ -207,22 +213,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
                 if (Number.isFinite(n) && n >= 0 && n <= 1) s.nativeAgent.topP = n;
               }
               await this.plugin.saveSettings();
-            }),
-        );
-
-      new Setting(containerEl)
-        .setName("Request timeout (сек)")
-        .setDesc("Таймаут HTTP-запроса к LLM.")
-        .addText((t) =>
-          t
-            .setPlaceholder("300")
-            .setValue(String(s.nativeAgent.requestTimeoutSec))
-            .onChange(async (v) => {
-              const n = Number(v);
-              if (Number.isFinite(n) && n > 0) {
-                s.nativeAgent.requestTimeoutSec = Math.floor(n);
-                await this.plugin.saveSettings();
-              }
             }),
         );
 
@@ -244,54 +234,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }),
         );
-
-      new Setting(containerEl)
-        .setName("Папка domain-map")
-        .setDesc("Где хранить domain-map-<vault>.json. Пусто — авто: <vault>/.obsidian/plugins/obsidian-llm-wiki/")
-        .addText((t) =>
-          t
-            .setPlaceholder("(авто)")
-            .setValue(s.nativeAgent.domainMapDir)
-            .onChange(async (v) => {
-              s.nativeAgent.domainMapDir = v.trim();
-              await this.plugin.saveSettings();
-            }),
-        );
     }
-
-    new Setting(containerEl)
-      .setName("Таймауты (секунды)")
-      .setDesc("ingest / query / lint / init")
-      .addText((t) =>
-        t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`)
-          .onChange(async (v) => {
-            const parts = v.split("/").map((x) => Number(x.trim()));
-            if (parts.length === 4 && parts.every((n) => Number.isFinite(n) && n > 0)) {
-              s.timeouts = { ingest: parts[0], query: parts[1], lint: parts[2], init: parts[3] };
-              await this.plugin.saveSettings();
-            }
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Лимит истории")
-      .setDesc("Максимум операций в истории боковой панели.")
-      .addText((t) =>
-        t.setValue(String(s.historyLimit))
-          .onChange(async (v) => {
-            const n = Number(v);
-            if (Number.isFinite(n) && n > 0) { s.historyLimit = Math.floor(n); await this.plugin.saveSettings(); }
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Лог агента (JSONL)")
-      .setDesc("Абсолютный путь к файлу лога. Пусто — отключено.")
-      .addText((t) =>
-        t
-          .setPlaceholder("/tmp/llm-wiki-agent.jsonl")
-          .setValue(s.agentLogPath)
-          .onChange(async (v) => { s.agentLogPath = v.trim(); await this.plugin.saveSettings(); }),
-      );
   }
 }

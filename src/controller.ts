@@ -48,10 +48,7 @@ export class WikiController {
 
   private resolveDomainMapDir(): string {
     const s = this.plugin.settings;
-    const dir = s.backend === "claude-agent"
-      ? s.claudeAgent.domainMapDir
-      : s.nativeAgent.domainMapDir;
-    if (dir) return dir;
+    if (s.domainMapDir) return s.domainMapDir;
     const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     return join(base, ".obsidian", "plugins", "obsidian-llm-wiki");
   }
@@ -86,12 +83,13 @@ export class WikiController {
     const domains = readDomains(domainMapDir, vaultName);
     const s = this.plugin.settings;
 
+    const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
     const llm = s.backend === "claude-agent"
-      ? new ClaudeCliClient(s.claudeAgent)
+      ? new ClaudeCliClient({ ...s.claudeAgent, maxTokens: s.maxTokens, requestTimeoutSec: maxTimeoutSec })
       : new OpenAI({
           baseURL: s.nativeAgent.baseUrl,
           apiKey: s.nativeAgent.apiKey,
-          timeout: s.nativeAgent.requestTimeoutSec * 1000,
+          timeout: maxTimeoutSec * 1000,
           dangerouslyAllowBrowser: true,
         });
 
