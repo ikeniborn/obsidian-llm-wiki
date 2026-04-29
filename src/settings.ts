@@ -19,7 +19,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       .setDesc("Выберите бэкенд для выполнения операций.")
       .addDropdown((d) =>
         d
-          .addOption("claude-agent", "Claude Agent (claude / iclaude.sh)")
+          .addOption("claude-agent", "Claude Code Agent")
           .addOption("native-agent", "Native Agent (OpenAI-compatible)")
           .setValue(s.backend)
           .onChange(async (v) => {
