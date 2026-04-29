@@ -26,7 +26,9 @@ export function parseStreamLine(raw: string): RunEvent | null {
 
   switch (obj.type) {
     case "system": {
-      const msg = `${obj.subtype ?? "system"}${obj.model ? ` (${obj.model})` : ""}`;
+      const subtype = typeof obj.subtype === "string" ? obj.subtype : "system";
+      const model = typeof obj.model === "string" ? obj.model : "";
+      const msg = `${subtype}${model ? ` (${model})` : ""}`;
       return { kind: "system", message: msg };
     }
     case "assistant":
@@ -52,17 +54,17 @@ function mapAssistant(obj: Record<string, unknown>): RunEvent | null {
       const input = isRecord(block.input) ? block.input : {};
       return {
         kind: "ask_user",
-        question: String(input.prompt ?? ""),
+        question: typeof input.prompt === "string" ? input.prompt : "",
         options: Array.isArray(input.options)
-          ? (input.options as unknown[]).map(String)
+          ? (input.options as unknown[]).map((o) => typeof o === "string" ? o : String(o))
           : [],
-        toolUseId: String(block.id ?? ""),
+        toolUseId: typeof block.id === "string" ? block.id : "",
       };
     }
-    return { kind: "tool_use", name: String(block.name ?? "?"), input: block.input };
+    return { kind: "tool_use", name: typeof block.name === "string" ? block.name : "?", input: block.input };
   }
   if (block?.type === "text") {
-    return { kind: "assistant_text", delta: String(block.text ?? "") };
+    return { kind: "assistant_text", delta: typeof block.text === "string" ? block.text : "" };
   }
   return null;
 }
@@ -81,13 +83,16 @@ function mapUserToolResult(obj: Record<string, unknown>): RunEvent | null {
 
 function mapResult(obj: Record<string, unknown>): RunEvent {
   if (obj.is_error || obj.subtype === "error") {
-    return { kind: "error", message: String(obj.result ?? obj.error ?? "claude error") };
+    const errMsg = typeof obj.result === "string" ? obj.result
+      : typeof obj.error === "string" ? obj.error
+      : "claude error";
+    return { kind: "error", message: errMsg };
   }
   return {
     kind: "result",
     durationMs: Number(obj.duration_ms ?? 0),
     usdCost: typeof obj.total_cost_usd === "number" ? obj.total_cost_usd : undefined,
-    text: String(obj.result ?? ""),
+    text: typeof obj.result === "string" ? obj.result : "",
   };
 }
 

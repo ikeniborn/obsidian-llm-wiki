@@ -33,7 +33,7 @@ export class ClaudeCliClient implements LlmClient {
       | OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
     opts?: { signal?: AbortSignal },
   ): Promise<AsyncIterable<OpenAI.Chat.ChatCompletionChunk> | OpenAI.Chat.ChatCompletion> {
-    const messages = params.messages as OpenAI.Chat.ChatCompletionMessageParam[];
+    const messages = params.messages;
     const systemContent = messages
       .filter((m) => m.role === "system")
       .map((m) => (typeof m.content === "string" ? m.content : ""))
@@ -42,7 +42,7 @@ export class ClaudeCliClient implements LlmClient {
     const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
 
     const model = (params as { model?: string }).model || this.cfg.model;
-    const { iclaudePath, maxTokens, requestTimeoutSec } = this.cfg;
+    const { maxTokens, requestTimeoutSec } = this.cfg;
     const args: string[] = ["-p", userText, "--output-format", "stream-json", "--verbose"];
     if (model) args.push("--model", model);
     if (maxTokens) args.push("--max-tokens", String(maxTokens));

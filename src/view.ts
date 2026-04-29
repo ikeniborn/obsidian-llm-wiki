@@ -50,7 +50,7 @@ export class LlmWikiView extends ItemView {
   }
 
   getViewType(): string { return LLM_WIKI_VIEW_TYPE; }
-  getDisplayText(): string { return "LLM Wiki"; }
+  getDisplayText(): string { return "LLM wiki"; }
   getIcon(): string { return "brain-circuit"; }
 
   onOpen(): void {
@@ -59,7 +59,7 @@ export class LlmWikiView extends ItemView {
     root.addClass("llm-wiki-view");
 
     const header = root.createDiv("llm-wiki-header");
-    header.createEl("h3", { text: "LLM Wiki" });
+    header.createEl("h3", { text: "LLM wiki" });
     this.statusEl = header.createDiv("llm-wiki-status");
 
     // Domain selector + per-domain actions
@@ -85,7 +85,7 @@ export class LlmWikiView extends ItemView {
       new ConfirmModal(this.plugin.app, "Ingest — confirm", [
         `File: ${file.name}`,
         "Claude will read the file, extract entities and update domain wiki pages.",
-      ], () => this.plugin.controller.ingestActive(domainId)).open();
+      ], () => void this.plugin.controller.ingestActive(domainId)).open();
     });
     this.lintBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
@@ -273,7 +273,7 @@ export class LlmWikiView extends ItemView {
           this.reasoningBlock.createSpan({ cls: "llm-wiki-reasoning-text" });
         }
         this.reasoningBuffer += ev.delta;
-        const span = this.reasoningBlock.querySelector(".llm-wiki-reasoning-text") as HTMLElement | null;
+        const span = this.reasoningBlock.querySelector<HTMLElement>(".llm-wiki-reasoning-text");
         if (span) span.setText(truncate(this.reasoningBuffer, ASSISTANT_TEXT_MAX));
       } else {
         if (!this.assistantBlock) {
@@ -282,7 +282,7 @@ export class LlmWikiView extends ItemView {
           this.assistantBlock.createSpan({ cls: "llm-wiki-assistant-text" });
         }
         this.assistantBuffer += ev.delta;
-        const span = this.assistantBlock.querySelector(".llm-wiki-assistant-text") as HTMLElement | null;
+        const span = this.assistantBlock.querySelector<HTMLElement>(".llm-wiki-assistant-text");
         if (span) span.setText(truncate(this.assistantBuffer, ASSISTANT_TEXT_MAX));
       }
       this.scrollSteps();

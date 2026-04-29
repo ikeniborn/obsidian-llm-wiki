@@ -166,7 +166,7 @@ var en = {
     maxTokens_name: "Max tokens",
     maxTokens_desc: "Maximum tokens in the response. Recommended \u2265 4096.",
     domainMapDir_name: "Domain-map folder",
-    domainMapDir_desc: "Where to store domain-map-<vault>.json. Empty \u2014 auto: <vault>/.obsidian/plugins/obsidian-llm-wiki/",
+    domainMapDir_desc: "Where to store domain-map-<vault>.json. Empty \u2014 auto: <vault>/<configDir>/plugins/obsidian-llm-wiki/",
     domainMapDir_placeholder: "(auto)",
     timeouts_name: "Timeouts (seconds)",
     timeouts_desc: "ingest / query / lint / init",
@@ -176,15 +176,15 @@ var en = {
     agentLog_desc: "Absolute path to log file. Empty \u2014 disabled.",
     backend_name: "Backend",
     backend_desc: "Select the backend for operations.",
-    claudeCodeAgent: "Claude Code Agent",
-    nativeAgent: "Native Agent (OpenAI-compatible)",
+    claudeCodeAgent: "Claude Code agent",
+    nativeAgent: "Native agent (OpenAI-compatible)",
     iclaudePath_name: "Path to Claude Code",
     iclaudePath_desc: "Required. Full absolute path to iclaude.sh / iclaude / claude.",
     model_name: "Model",
     model_desc_claude: "Model name: sonnet, opus, claude-sonnet-4-6, etc.",
     baseUrl_name: "Base URL",
     baseUrl_desc: "OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1",
-    apiKey_name: "API Key",
+    apiKey_name: "API key",
     apiKey_desc: 'For Ollama enter "ollama". For OpenAI \u2014 key sk-...',
     model_desc_native: "Model name: llama3.2, mistral, gpt-4o, etc.",
     temperature_name: "Temperature",
@@ -282,7 +282,7 @@ var ru = {
     maxTokens_name: "Max tokens",
     maxTokens_desc: "\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u0432 \u0432 \u043E\u0442\u0432\u0435\u0442\u0435. \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F \u2265 4096.",
     domainMapDir_name: "\u041F\u0430\u043F\u043A\u0430 domain-map",
-    domainMapDir_desc: "\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/.obsidian/plugins/obsidian-llm-wiki/",
+    domainMapDir_desc: "\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/<configDir>/plugins/obsidian-llm-wiki/",
     domainMapDir_placeholder: "(\u0430\u0432\u0442\u043E)",
     timeouts_name: "\u0422\u0430\u0439\u043C\u0430\u0443\u0442\u044B (\u0441\u0435\u043A\u0443\u043D\u0434\u044B)",
     timeouts_desc: "ingest / query / lint / init",
@@ -292,15 +292,15 @@ var ru = {
     agentLog_desc: "\u0410\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A \u0444\u0430\u0439\u043B\u0443 \u043B\u043E\u0433\u0430. \u041F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E.",
     backend_name: "Backend",
     backend_desc: "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0431\u044D\u043A\u0435\u043D\u0434 \u0434\u043B\u044F \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439.",
-    claudeCodeAgent: "Claude Code Agent",
-    nativeAgent: "Native Agent (OpenAI-compatible)",
+    claudeCodeAgent: "Claude Code agent",
+    nativeAgent: "Native agent (OpenAI-compatible)",
     iclaudePath_name: "\u041F\u0443\u0442\u044C \u043A Claude Code",
     iclaudePath_desc: "\u041E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E. \u041F\u043E\u043B\u043D\u044B\u0439 \u0430\u0431\u0441\u043E\u043B\u044E\u0442\u043D\u044B\u0439 \u043F\u0443\u0442\u044C \u043A iclaude.sh / iclaude / claude.",
     model_name: "\u041C\u043E\u0434\u0435\u043B\u044C",
     model_desc_claude: "\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438: sonnet, opus, claude-sonnet-4-6 \u0438 \u0442.\u043F.",
     baseUrl_name: "Base URL",
     baseUrl_desc: "OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1",
-    apiKey_name: "API Key",
+    apiKey_name: "API key",
     apiKey_desc: '\u0414\u043B\u044F Ollama \u0432\u0432\u0435\u0434\u0438\u0442\u0435 "ollama". \u0414\u043B\u044F OpenAI \u2014 \u043A\u043B\u044E\u0447 sk-...',
     model_desc_native: "\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438: llama3.2, mistral, gpt-4o \u0438 \u0442.\u043F.",
     temperature_name: "Temperature",
@@ -398,7 +398,7 @@ var es = {
     maxTokens_name: "M\xE1x. tokens",
     maxTokens_desc: "M\xE1ximo de tokens en la respuesta. Recomendado \u2265 4096.",
     domainMapDir_name: "Carpeta domain-map",
-    domainMapDir_desc: "D\xF3nde guardar domain-map-<vault>.json. Vac\xEDo \u2014 auto: <vault>/.obsidian/plugins/obsidian-llm-wiki/",
+    domainMapDir_desc: "D\xF3nde guardar domain-map-<vault>.json. Vac\xEDo \u2014 auto: <vault>/<configDir>/plugins/obsidian-llm-wiki/",
     domainMapDir_placeholder: "(auto)",
     timeouts_name: "Tiempos de espera (segundos)",
     timeouts_desc: "ingest / query / lint / init",
@@ -408,15 +408,15 @@ var es = {
     agentLog_desc: "Ruta absoluta al archivo de log. Vac\xEDo \u2014 desactivado.",
     backend_name: "Backend",
     backend_desc: "Selecciona el backend para las operaciones.",
-    claudeCodeAgent: "Claude Code Agent",
-    nativeAgent: "Native Agent (OpenAI-compatible)",
+    claudeCodeAgent: "Claude Code agent",
+    nativeAgent: "Native agent (OpenAI-compatible)",
     iclaudePath_name: "Ruta a Claude Code",
     iclaudePath_desc: "Obligatorio. Ruta absoluta completa a iclaude.sh / iclaude / claude.",
     model_name: "Modelo",
     model_desc_claude: "Nombre del modelo: sonnet, opus, claude-sonnet-4-6, etc.",
     baseUrl_name: "Base URL",
     baseUrl_desc: "Endpoint compatible con OpenAI. Ollama: http://localhost:11434/v1",
-    apiKey_name: "API Key",
+    apiKey_name: "API key",
     apiKey_desc: 'Para Ollama introduce "ollama". Para OpenAI \u2014 clave sk-...',
     model_desc_native: "Nombre del modelo: llama3.2, mistral, gpt-4o, etc.",
     temperature_name: "Temperatura",
@@ -522,7 +522,6 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
     containerEl.empty();
     const s = this.plugin.settings;
     const T = i18n();
-    new import_obsidian2.Setting(containerEl).setName("LLM Wiki").setHeading();
     new import_obsidian2.Setting(containerEl).setName(T.settings.h3_general).setHeading();
     new import_obsidian2.Setting(containerEl).setName(T.settings.systemPrompt_name).setDesc(T.settings.systemPrompt_desc).addTextArea((t) => {
       t.inputEl.addClass("llm-wiki-settings-textarea");
@@ -951,7 +950,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     return LLM_WIKI_VIEW_TYPE;
   }
   getDisplayText() {
-    return "LLM Wiki";
+    return "LLM wiki";
   }
   getIcon() {
     return "brain-circuit";
@@ -961,7 +960,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     root.empty();
     root.addClass("llm-wiki-view");
     const header = root.createDiv("llm-wiki-header");
-    header.createEl("h3", { text: "LLM Wiki" });
+    header.createEl("h3", { text: "LLM wiki" });
     this.statusEl = header.createDiv("llm-wiki-status");
     const domainBox = root.createDiv("llm-wiki-domain");
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
@@ -986,7 +985,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       new ConfirmModal(this.plugin.app, "Ingest \u2014 confirm", [
         `File: ${file.name}`,
         "Claude will read the file, extract entities and update domain wiki pages."
-      ], () => this.plugin.controller.ingestActive(domainId)).open();
+      ], () => void this.plugin.controller.ingestActive(domainId)).open();
     });
     this.lintBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
@@ -2227,7 +2226,9 @@ function parseStreamLine(raw) {
     return null;
   switch (obj.type) {
     case "system": {
-      const msg = `${obj.subtype ?? "system"}${obj.model ? ` (${obj.model})` : ""}`;
+      const subtype = typeof obj.subtype === "string" ? obj.subtype : "system";
+      const model = typeof obj.model === "string" ? obj.model : "";
+      const msg = `${subtype}${model ? ` (${model})` : ""}`;
       return { kind: "system", message: msg };
     }
     case "assistant":
@@ -2253,15 +2254,15 @@ function mapAssistant(obj) {
       const input = isRecord(block.input) ? block.input : {};
       return {
         kind: "ask_user",
-        question: String(input.prompt ?? ""),
-        options: Array.isArray(input.options) ? input.options.map(String) : [],
-        toolUseId: String(block.id ?? "")
+        question: typeof input.prompt === "string" ? input.prompt : "",
+        options: Array.isArray(input.options) ? input.options.map((o) => typeof o === "string" ? o : String(o)) : [],
+        toolUseId: typeof block.id === "string" ? block.id : ""
       };
     }
-    return { kind: "tool_use", name: String(block.name ?? "?"), input: block.input };
+    return { kind: "tool_use", name: typeof block.name === "string" ? block.name : "?", input: block.input };
   }
   if (block?.type === "text") {
-    return { kind: "assistant_text", delta: String(block.text ?? "") };
+    return { kind: "assistant_text", delta: typeof block.text === "string" ? block.text : "" };
   }
   return null;
 }
@@ -2281,13 +2282,14 @@ function mapUserToolResult(obj) {
 }
 function mapResult(obj) {
   if (obj.is_error || obj.subtype === "error") {
-    return { kind: "error", message: String(obj.result ?? obj.error ?? "claude error") };
+    const errMsg = typeof obj.result === "string" ? obj.result : typeof obj.error === "string" ? obj.error : "claude error";
+    return { kind: "error", message: errMsg };
   }
   return {
     kind: "result",
     durationMs: Number(obj.duration_ms ?? 0),
     usdCost: typeof obj.total_cost_usd === "number" ? obj.total_cost_usd : void 0,
-    text: String(obj.result ?? "")
+    text: typeof obj.result === "string" ? obj.result : ""
   };
 }
 function truncate2(s, n) {
@@ -2311,7 +2313,7 @@ var ClaudeCliClient = class {
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
     const model = params.model || this.cfg.model;
-    const { iclaudePath, maxTokens, requestTimeoutSec } = this.cfg;
+    const { maxTokens, requestTimeoutSec } = this.cfg;
     const args = ["-p", userText, "--output-format", "stream-json", "--verbose"];
     if (model)
       args.push("--model", model);
@@ -9774,7 +9776,7 @@ var WikiController = class {
       if (right)
         await right.setViewState({ type: LLM_WIKI_VIEW_TYPE, active: true });
     } else {
-      this.app.workspace.revealLeaf(leaves[0]);
+      void this.app.workspace.revealLeaf(leaves[0]);
     }
   }
   activeView() {
@@ -9799,10 +9801,10 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
     await this.loadSettings();
     this.controller = new WikiController(this.app, this);
     this.registerView(LLM_WIKI_VIEW_TYPE, (leaf) => new LlmWikiView(leaf, this));
-    this.addRibbonIcon("brain-circuit", "LLM Wiki", () => {
+    this.addRibbonIcon("brain-circuit", "LLM wiki", () => {
       const leaves = this.app.workspace.getLeavesOfType(LLM_WIKI_VIEW_TYPE);
       if (leaves.length > 0) {
-        this.app.workspace.revealLeaf(leaves[0]);
+        void this.app.workspace.revealLeaf(leaves[0]);
       } else {
         const right = this.app.workspace.getRightLeaf(false);
         if (right)

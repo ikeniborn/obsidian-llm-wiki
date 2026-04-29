@@ -65,7 +65,7 @@ export class AgentRunner {
         break;
       default: {
         const start = Date.now();
-        yield { kind: "error", message: `Unknown operation: ${req.operation}` };
+        yield { kind: "error", message: `Unknown operation: ${req.operation as string}` };
         yield { kind: "result", durationMs: Date.now() - start, text: "" };
       }
     }

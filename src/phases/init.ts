@@ -3,7 +3,6 @@ import type { DomainEntry } from "../domain-map";
 import type { LlmCallOptions, RunEvent, LlmClient } from "../types";
 import type { VaultTools } from "../vault-tools";
 import { buildChatParams, extractStreamDeltas } from "./llm-utils";
-import { parseJsonPages } from "./ingest";
 
 export async function* runInit(
   args: string[],

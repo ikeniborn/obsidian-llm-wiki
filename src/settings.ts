@@ -14,8 +14,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     const s = this.plugin.settings;
     const T = i18n();
 
-    new Setting(containerEl).setName("LLM Wiki").setHeading();
-
     // ── General settings ───────────────────────────────────────────────────
     new Setting(containerEl).setName(T.settings.h3_general).setHeading();
 
