@@ -41,7 +41,8 @@ export class ClaudeCliClient implements LlmClient {
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
 
-    const { iclaudePath, model, maxTokens, requestTimeoutSec } = this.cfg;
+    const model = (params as { model?: string }).model || this.cfg.model;
+    const { iclaudePath, maxTokens, requestTimeoutSec } = this.cfg;
     const args: string[] = ["-p", userText, "--output-format", "stream-json", "--verbose"];
     if (model) args.push("--model", model);
     if (maxTokens) args.push("--max-tokens", String(maxTokens));
