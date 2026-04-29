@@ -216,6 +216,10 @@ export class LlmWikiView extends ItemView {
     this.stepCount++;
     if (ev.kind === "tool_use") {
       this.toolCount++;
+      this.assistantBlock = null;
+      this.assistantBuffer = "";
+      this.reasoningBlock = null;
+      this.reasoningBuffer = "";
       const step = this.stepsEl.createDiv("llm-wiki-step");
       const head = step.createDiv("llm-wiki-step-head");
       head.createSpan({ cls: "llm-wiki-step-icon" }).setText("🔧");

@@ -54,6 +54,10 @@ export class WikiController {
     return join(base, ".obsidian", "plugins", "obsidian-llm-wiki");
   }
 
+  cwdOrEmpty(): string {
+    return (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+  }
+
   loadDomains(): DomainEntry[] {
     return readDomains(this.resolveDomainMapDir(), this.app.vault.getName());
   }
