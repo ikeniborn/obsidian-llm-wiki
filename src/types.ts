@@ -1,3 +1,5 @@
+import type OpenAI from "openai";
+
 export type WikiOperation =
   | "ingest"
   | "query"
@@ -45,13 +47,25 @@ export interface LlmCallOptions {
   numCtx?: number | null;
 }
 
+/** Минимальный интерфейс OpenAI-клиента, используемый фазами. */
+export type LlmClient = {
+  chat: {
+    completions: {
+      create(
+        params: OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+        opts?: { signal?: AbortSignal },
+      ): Promise<AsyncIterable<OpenAI.Chat.ChatCompletionChunk>>;
+      create(
+        params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+        opts?: { signal?: AbortSignal },
+      ): Promise<OpenAI.Chat.ChatCompletion>;
+    };
+  };
+};
+
 export interface LlmWikiPluginSettings {
-  iclaudePath: string;
-  cwd: string;
-  allowedTools: string[];
-  /** Модель claude. Пусто = модель по умолчанию из настроек claude. */
-  model: string;
-  showRawJson: boolean;
+  backend: "claude-agent" | "native-agent";
+  agentLogPath: string;
   historyLimit: number;
   timeouts: {
     ingest: number;
@@ -60,8 +74,14 @@ export interface LlmWikiPluginSettings {
     init: number;
   };
   history: RunHistoryEntry[];
-  backend: "claude-code" | "native-agent";
-  agentLogPath: string;
+  claudeAgent: {
+    iclaudePath: string;
+    model: string;
+    domainMapDir: string;
+    systemPrompt: string;
+    maxTokens: number;
+    requestTimeoutSec: number;
+  };
   nativeAgent: {
     baseUrl: string;
     apiKey: string;
@@ -72,29 +92,24 @@ export interface LlmWikiPluginSettings {
     topP: number | null;
     systemPrompt: string;
     numCtx: number | null;
-    domainMapDir: string; // "" = авто: <vault>/.obsidian/plugins/llm-wiki/
+    domainMapDir: string;
   };
 }
 
-/** Пресеты модели для UI; пользователь может ввести произвольное значение. */
-export const MODEL_PRESETS: Array<{ value: string; label: string }> = [
-  { value: "", label: "(по умолчанию)" },
-  { value: "opus", label: "opus (Opus 4.7)" },
-  { value: "sonnet", label: "sonnet (Sonnet 4.6)" },
-  { value: "haiku", label: "haiku (Haiku 4.5)" },
-];
-
 export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
-  iclaudePath: "",
-  cwd: "",
-  allowedTools: ["Read", "Edit", "Write", "Glob", "Grep"],
-  model: "",
-  showRawJson: false,
+  backend: "claude-agent",
+  agentLogPath: "",
   historyLimit: 20,
   timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
   history: [],
-  backend: "claude-code",
-  agentLogPath: "",
+  claudeAgent: {
+    iclaudePath: "",
+    model: "",
+    domainMapDir: "",
+    systemPrompt: "",
+    maxTokens: 4096,
+    requestTimeoutSec: 300,
+  },
   nativeAgent: {
     baseUrl: "http://localhost:11434/v1",
     apiKey: "ollama",
