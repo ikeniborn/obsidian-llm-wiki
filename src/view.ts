@@ -110,7 +110,7 @@ export class LlmWikiView extends ItemView {
     const ask = root.createDiv("llm-wiki-ask");
     this.queryInput = ask.createEl("textarea", {
       cls: "llm-wiki-query-input",
-      attr: { placeholder: "Question… (Ctrl+Enter — ask, Ctrl+Shift+Enter — ask and save)", rows: "3" },
+      attr: { placeholder: "Question…", rows: "3" },
     });
     const askRow = ask.createDiv("llm-wiki-ask-row");
     this.askBtn = askRow.createEl("button", { text: T.view.ask });
