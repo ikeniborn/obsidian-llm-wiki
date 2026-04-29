@@ -104,4 +104,38 @@ describe("ClaudeCliClient", () => {
     );
     expect(proc.kill).toHaveBeenCalledWith("SIGTERM");
   });
+
+  it("aborts non-streaming call mid-flight via signal", async () => {
+    // Process that stays open until killed
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const proc = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      stdin: null,
+      exitCode: null as number | null,
+      kill: vi.fn((sig: string) => {
+        // Simulate process dying on SIGTERM
+        (proc as any).exitCode = 1;
+        proc.emit("close", 1);
+      }),
+    });
+    (spawn as any).mockReturnValue(proc);
+
+    const ctrl = new AbortController();
+    const client = new ClaudeCliClient(cfg);
+
+    // Start the non-streaming call (it will block waiting for process to close)
+    const createPromise = client.chat.completions.create(
+      { model: "sonnet", messages: [{ role: "user", content: "hi" }], stream: false } as any,
+      { signal: ctrl.signal },
+    );
+
+    // Abort after a tick (mid-flight)
+    await Promise.resolve();
+    ctrl.abort();
+
+    await createPromise;
+    expect(proc.kill).toHaveBeenCalledWith("SIGTERM");
+  });
 });
