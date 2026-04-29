@@ -164,7 +164,7 @@ export class WikiController {
       }
     } catch (err) {
       status = "error";
-      finalText = `Ошибка: ${(err as Error).message}`;
+      finalText = i18n().ctrl.errorPrefix((err as Error).message);
       this.logEvent(sessionId, op, domainId, { kind: "error", message: finalText });
     } finally {
       this.current = null;

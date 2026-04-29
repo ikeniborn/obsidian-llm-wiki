@@ -67,6 +67,7 @@ const en = {
     domainAddFailed: (err: string) => `Failed to add domain: ${err}`,
     setClaudeCodePath: "Set Claude Code path in settings",
     operationRunning: "Operation already running, cancel it first",
+    errorPrefix: (msg: string) => `Error: ${msg}`,
   },
   cmd: {
     openPanel: "Open panel",
@@ -173,6 +174,7 @@ const ru: I18n = {
     domainAddFailed: (err: string) => `Не удалось добавить домен: ${err}`,
     setClaudeCodePath: "Укажите путь к Claude Code в настройках",
     operationRunning: "Уже выполняется операция, отмените её сначала",
+    errorPrefix: (msg: string) => `Ошибка: ${msg}`,
   },
   cmd: {
     openPanel: "Открыть панель",
@@ -277,6 +279,7 @@ const es: I18n = {
     domainAddFailed: (err: string) => `Error al añadir dominio: ${err}`,
     setClaudeCodePath: "Configura la ruta a Claude Code en los ajustes",
     operationRunning: "Ya hay una operación en curso, cancélala primero",
+    errorPrefix: (msg: string) => `Error: ${msg}`,
   },
   cmd: {
     openPanel: "Abrir panel",
