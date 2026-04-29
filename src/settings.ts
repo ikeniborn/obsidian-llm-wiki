@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type LlmWikiPlugin from "./main";
-import type { LlmWikiPluginSettings } from "./types";
+import type { LlmWikiPluginSettings, OpKey } from "./types";
 import { i18n } from "./i18n";
 
 export class LlmWikiSettingTab extends PluginSettingTab {
@@ -25,42 +25,33 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       .addTextArea((t) => {
         t.inputEl.style.minHeight = "96px";
         t.inputEl.style.width = "100%";
-        t
-          .setValue(s.systemPrompt)
-          .onChange(async (v) => {
-            s.systemPrompt = v;
-            await this.plugin.saveSettings();
-          });
+        t.setValue(s.systemPrompt)
+          .onChange(async (v) => { s.systemPrompt = v; await this.plugin.saveSettings(); });
         return t;
       });
 
-    new Setting(containerEl)
-      .setName(T.settings.maxTokens_name)
-      .setDesc(T.settings.maxTokens_desc)
-      .addText((t) =>
-        t
-          .setPlaceholder("4096")
-          .setValue(String(s.maxTokens))
-          .onChange(async (v) => {
-            const n = Number(v);
-            if (Number.isFinite(n) && n > 0) {
-              s.maxTokens = Math.floor(n);
-              await this.plugin.saveSettings();
-            }
-          }),
-      );
+    const isPerOp = s.backend === "claude-agent" ? s.claudeAgent.perOperation : s.nativeAgent.perOperation;
+    if (!isPerOp) {
+      new Setting(containerEl)
+        .setName(T.settings.maxTokens_name)
+        .setDesc(T.settings.maxTokens_desc)
+        .addText((t) =>
+          t.setPlaceholder("4096")
+            .setValue(String(s.maxTokens))
+            .onChange(async (v) => {
+              const n = Number(v);
+              if (Number.isFinite(n) && n > 0) { s.maxTokens = Math.floor(n); await this.plugin.saveSettings(); }
+            }),
+        );
+    }
 
     new Setting(containerEl)
       .setName(T.settings.domainMapDir_name)
       .setDesc(T.settings.domainMapDir_desc)
       .addText((t) =>
-        t
-          .setPlaceholder(T.settings.domainMapDir_placeholder)
+        t.setPlaceholder(T.settings.domainMapDir_placeholder)
           .setValue(s.domainMapDir)
-          .onChange(async (v) => {
-            s.domainMapDir = v.trim();
-            await this.plugin.saveSettings();
-          }),
+          .onChange(async (v) => { s.domainMapDir = v.trim(); await this.plugin.saveSettings(); }),
       );
 
     new Setting(containerEl)
@@ -92,8 +83,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       .setName(T.settings.agentLog_name)
       .setDesc(T.settings.agentLog_desc)
       .addText((t) =>
-        t
-          .setPlaceholder("/tmp/llm-wiki-agent.jsonl")
+        t.setPlaceholder("/tmp/llm-wiki-agent.jsonl")
           .setValue(s.agentLogPath)
           .onChange(async (v) => { s.agentLogPath = v.trim(); await this.plugin.saveSettings(); }),
       );
@@ -105,8 +95,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       .setName(T.settings.backend_name)
       .setDesc(T.settings.backend_desc)
       .addDropdown((d) =>
-        d
-          .addOption("claude-agent", T.settings.claudeCodeAgent)
+        d.addOption("claude-agent", T.settings.claudeCodeAgent)
           .addOption("native-agent", T.settings.nativeAgent)
           .setValue(s.backend)
           .onChange(async (v) => {
@@ -121,98 +110,157 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         .setName(T.settings.iclaudePath_name)
         .setDesc(T.settings.iclaudePath_desc)
         .addText((t) =>
-          t
-            .setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh")
+          t.setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh")
             .setValue(s.claudeAgent.iclaudePath)
-            .onChange(async (v) => {
-              s.claudeAgent.iclaudePath = v.trim();
-              await this.plugin.saveSettings();
-            }),
+            .onChange(async (v) => { s.claudeAgent.iclaudePath = v.trim(); await this.plugin.saveSettings(); }),
         );
 
+      if (!s.claudeAgent.perOperation) {
+        new Setting(containerEl)
+          .setName(T.settings.model_name)
+          .setDesc(T.settings.model_desc_claude)
+          .addText((t) =>
+            t.setPlaceholder("sonnet")
+              .setValue(s.claudeAgent.model)
+              .onChange(async (v) => { s.claudeAgent.model = v.trim(); await this.plugin.saveSettings(); }),
+          );
+      }
+
       new Setting(containerEl)
-        .setName(T.settings.model_name)
-        .setDesc(T.settings.model_desc_claude)
-        .addText((t) =>
-          t
-            .setPlaceholder("sonnet")
-            .setValue(s.claudeAgent.model)
-            .onChange(async (v) => {
-              s.claudeAgent.model = v.trim();
-              await this.plugin.saveSettings();
-            }),
+        .setName(T.settings.perOperation_name)
+        .setDesc(T.settings.perOperation_desc)
+        .addToggle((t) =>
+          t.setValue(s.claudeAgent.perOperation)
+            .onChange(async (v) => { s.claudeAgent.perOperation = v; await this.plugin.saveSettings(); this.display(); }),
         );
+
+      if (s.claudeAgent.perOperation) {
+        const ops: Array<{ key: OpKey; label: string }> = [
+          { key: "ingest", label: T.settings.op_ingest },
+          { key: "query",  label: T.settings.op_query },
+          { key: "lint",   label: T.settings.op_lint },
+          { key: "init",   label: T.settings.op_init },
+        ];
+        for (const { key, label } of ops) {
+          containerEl.createEl("h5", { text: label });
+          new Setting(containerEl)
+            .setName(T.settings.opModel_name)
+            .setDesc(T.settings.opModel_desc)
+            .addText((t) =>
+              t.setValue(s.claudeAgent.operations[key].model)
+                .onChange(async (v) => { s.claudeAgent.operations[key].model = v.trim(); await this.plugin.saveSettings(); }),
+            );
+          new Setting(containerEl)
+            .setName(T.settings.opMaxTokens_name)
+            .setDesc(T.settings.opMaxTokens_desc)
+            .addText((t) =>
+              t.setValue(String(s.claudeAgent.operations[key].maxTokens))
+                .onChange(async (v) => {
+                  const n = Number(v);
+                  if (Number.isFinite(n) && n > 0) { s.claudeAgent.operations[key].maxTokens = Math.floor(n); await this.plugin.saveSettings(); }
+                }),
+            );
+        }
+      }
     } else {
       new Setting(containerEl)
         .setName(T.settings.baseUrl_name)
         .setDesc(T.settings.baseUrl_desc)
         .addText((t) =>
-          t
-            .setPlaceholder("http://localhost:11434/v1")
+          t.setPlaceholder("http://localhost:11434/v1")
             .setValue(s.nativeAgent.baseUrl)
-            .onChange(async (v) => {
-              s.nativeAgent.baseUrl = v.trim();
-              await this.plugin.saveSettings();
-            }),
+            .onChange(async (v) => { s.nativeAgent.baseUrl = v.trim(); await this.plugin.saveSettings(); }),
         );
 
       new Setting(containerEl)
         .setName(T.settings.apiKey_name)
         .setDesc(T.settings.apiKey_desc)
         .addText((t) =>
-          t
-            .setPlaceholder("ollama")
+          t.setPlaceholder("ollama")
             .setValue(s.nativeAgent.apiKey)
-            .onChange(async (v) => {
-              s.nativeAgent.apiKey = v.trim();
-              await this.plugin.saveSettings();
-            }),
+            .onChange(async (v) => { s.nativeAgent.apiKey = v.trim(); await this.plugin.saveSettings(); }),
         );
 
-      new Setting(containerEl)
-        .setName(T.settings.model_name)
-        .setDesc(T.settings.model_desc_native)
-        .addText((t) =>
-          t
-            .setPlaceholder("llama3.2")
-            .setValue(s.nativeAgent.model)
-            .onChange(async (v) => {
-              s.nativeAgent.model = v.trim();
-              await this.plugin.saveSettings();
-            }),
-        );
+      if (!s.nativeAgent.perOperation) {
+        new Setting(containerEl)
+          .setName(T.settings.model_name)
+          .setDesc(T.settings.model_desc_native)
+          .addText((t) =>
+            t.setPlaceholder("llama3.2")
+              .setValue(s.nativeAgent.model)
+              .onChange(async (v) => { s.nativeAgent.model = v.trim(); await this.plugin.saveSettings(); }),
+          );
+
+        new Setting(containerEl)
+          .setName(T.settings.temperature_name)
+          .setDesc(T.settings.temperature_desc)
+          .addText((t) =>
+            t.setPlaceholder("0.2")
+              .setValue(String(s.nativeAgent.temperature))
+              .onChange(async (v) => {
+                const n = Number(v);
+                if (Number.isFinite(n) && n >= 0 && n <= 2) { s.nativeAgent.temperature = n; await this.plugin.saveSettings(); }
+              }),
+          );
+      }
 
       new Setting(containerEl)
-        .setName(T.settings.temperature_name)
-        .setDesc(T.settings.temperature_desc)
-        .addText((t) =>
-          t
-            .setPlaceholder("0.2")
-            .setValue(String(s.nativeAgent.temperature))
-            .onChange(async (v) => {
-              const n = Number(v);
-              if (Number.isFinite(n) && n >= 0 && n <= 2) {
-                s.nativeAgent.temperature = n;
-                await this.plugin.saveSettings();
-              }
-            }),
+        .setName(T.settings.perOperation_name)
+        .setDesc(T.settings.perOperation_desc)
+        .addToggle((t) =>
+          t.setValue(s.nativeAgent.perOperation)
+            .onChange(async (v) => { s.nativeAgent.perOperation = v; await this.plugin.saveSettings(); this.display(); }),
         );
+
+      if (s.nativeAgent.perOperation) {
+        const ops: Array<{ key: OpKey; label: string }> = [
+          { key: "ingest", label: T.settings.op_ingest },
+          { key: "query",  label: T.settings.op_query },
+          { key: "lint",   label: T.settings.op_lint },
+          { key: "init",   label: T.settings.op_init },
+        ];
+        for (const { key, label } of ops) {
+          containerEl.createEl("h5", { text: label });
+          new Setting(containerEl)
+            .setName(T.settings.opModel_name)
+            .setDesc(T.settings.opModel_desc)
+            .addText((t) =>
+              t.setValue(s.nativeAgent.operations[key].model)
+                .onChange(async (v) => { s.nativeAgent.operations[key].model = v.trim(); await this.plugin.saveSettings(); }),
+            );
+          new Setting(containerEl)
+            .setName(T.settings.opMaxTokens_name)
+            .setDesc(T.settings.opMaxTokens_desc)
+            .addText((t) =>
+              t.setValue(String(s.nativeAgent.operations[key].maxTokens))
+                .onChange(async (v) => {
+                  const n = Number(v);
+                  if (Number.isFinite(n) && n > 0) { s.nativeAgent.operations[key].maxTokens = Math.floor(n); await this.plugin.saveSettings(); }
+                }),
+            );
+          new Setting(containerEl)
+            .setName(T.settings.opTemperature_name)
+            .setDesc(T.settings.opTemperature_desc)
+            .addText((t) =>
+              t.setValue(String(s.nativeAgent.operations[key].temperature))
+                .onChange(async (v) => {
+                  const n = Number(v);
+                  if (Number.isFinite(n) && n >= 0 && n <= 2) { s.nativeAgent.operations[key].temperature = n; await this.plugin.saveSettings(); }
+                }),
+            );
+        }
+      }
 
       new Setting(containerEl)
         .setName(T.settings.topP_name)
         .setDesc(T.settings.topP_desc)
         .addText((t) =>
-          t
-            .setPlaceholder("(отключено)")
+          t.setPlaceholder("(отключено)")
             .setValue(s.nativeAgent.topP != null ? String(s.nativeAgent.topP) : "")
             .onChange(async (v) => {
               const trimmed = v.trim();
-              if (!trimmed) {
-                s.nativeAgent.topP = null;
-              } else {
-                const n = Number(trimmed);
-                if (Number.isFinite(n) && n >= 0 && n <= 1) s.nativeAgent.topP = n;
-              }
+              if (!trimmed) { s.nativeAgent.topP = null; }
+              else { const n = Number(trimmed); if (Number.isFinite(n) && n >= 0 && n <= 1) s.nativeAgent.topP = n; }
               await this.plugin.saveSettings();
             }),
         );
@@ -221,17 +269,12 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         .setName(T.settings.numCtx_name)
         .setDesc(T.settings.numCtx_desc)
         .addText((t) =>
-          t
-            .setPlaceholder("(дефолт модели)")
+          t.setPlaceholder("(дефолт модели)")
             .setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "")
             .onChange(async (v) => {
               const trimmed = v.trim();
-              if (!trimmed) {
-                s.nativeAgent.numCtx = null;
-              } else {
-                const n = Number(trimmed);
-                if (Number.isFinite(n) && n > 0) s.nativeAgent.numCtx = Math.floor(n);
-              }
+              if (!trimmed) { s.nativeAgent.numCtx = null; }
+              else { const n = Number(trimmed); if (Number.isFinite(n) && n > 0) s.nativeAgent.numCtx = Math.floor(n); }
               await this.plugin.saveSettings();
             }),
         );
