@@ -118,6 +118,7 @@ export class LlmWikiView extends ItemView {
     this.queryInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
+        e.stopPropagation();
         this.submitQuery(e.shiftKey);
       }
     });
