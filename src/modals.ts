@@ -1,5 +1,5 @@
 import { App, Modal, Setting } from "obsidian";
-import type { AddDomainInput, DomainEntry } from "./domain-map";
+import type { AddDomainInput, DomainEntry, EntityType } from "./domain-map";
 import { i18n } from "./i18n";
 
 export class ConfirmModal extends Modal {
@@ -185,6 +185,98 @@ export class AddDomainModal extends Modal {
         this.onSubmit(this.input);
       }),
     );
+  }
+
+  onClose(): void { this.contentEl.empty(); }
+}
+
+export class EditDomainModal extends Modal {
+  private nameVal: string;
+  private wikiFolderVal: string;
+  private sourcePathsVal: string;
+  private entityTypesVal: string;
+  private languageNotesVal: string;
+  private errorEl: HTMLElement | null = null;
+
+  constructor(
+    app: App,
+    private domain: DomainEntry,
+    private onSave: (updated: DomainEntry) => void,
+  ) {
+    super(app);
+    this.nameVal = domain.name;
+    this.wikiFolderVal = domain.wiki_folder;
+    this.sourcePathsVal = (domain.source_paths ?? []).join("\n");
+    this.entityTypesVal = JSON.stringify(domain.entity_types ?? [], null, 2);
+    this.languageNotesVal = domain.language_notes ?? "";
+  }
+
+  onOpen(): void {
+    const T = i18n().modal;
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: T.editDomainTitle(this.domain.id) });
+
+    new Setting(contentEl)
+      .setName(T.displayName_name)
+      .addText((t) => t.setValue(this.nameVal).onChange((v) => { this.nameVal = v; }));
+
+    new Setting(contentEl)
+      .setName(T.wikiFolder_name)
+      .addText((t) => t.setValue(this.wikiFolderVal).onChange((v) => { this.wikiFolderVal = v; }));
+
+    new Setting(contentEl)
+      .setName(T.sourcePathsLabel)
+      .setDesc(T.sourcePaths_desc)
+      .addTextArea((t) => {
+        t.inputEl.rows = 4;
+        t.inputEl.style.width = "100%";
+        t.setValue(this.sourcePathsVal).onChange((v) => { this.sourcePathsVal = v; });
+      });
+
+    new Setting(contentEl)
+      .setName(T.entityTypesLabel)
+      .addTextArea((t) => {
+        t.inputEl.rows = 10;
+        t.inputEl.style.width = "100%";
+        t.inputEl.style.fontFamily = "monospace";
+        t.setValue(this.entityTypesVal).onChange((v) => { this.entityTypesVal = v; });
+      });
+
+    new Setting(contentEl)
+      .setName(T.languageNotesLabel)
+      .addText((t) => t.setValue(this.languageNotesVal).onChange((v) => { this.languageNotesVal = v; }));
+
+    this.errorEl = contentEl.createEl("p", { cls: "mod-warning" });
+    this.errorEl.style.display = "none";
+
+    new Setting(contentEl)
+      .addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close()))
+      .addButton((b) => b.setButtonText(T.save).setCta().onClick(() => this.handleSave()));
+  }
+
+  private handleSave(): void {
+    let entityTypes: EntityType[];
+    try {
+      const parsed = JSON.parse(this.entityTypesVal.trim() || "[]");
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      entityTypes = parsed as EntityType[];
+    } catch {
+      if (this.errorEl) {
+        this.errorEl.textContent = i18n().modal.entityTypesError;
+        this.errorEl.style.display = "";
+      }
+      return;
+    }
+    const updated: DomainEntry = {
+      ...this.domain,
+      name: this.nameVal.trim() || this.domain.name,
+      wiki_folder: this.wikiFolderVal.trim() || this.domain.wiki_folder,
+      source_paths: this.sourcePathsVal.split("\n").map((s) => s.trim()).filter(Boolean),
+      entity_types: entityTypes,
+      language_notes: this.languageNotesVal.trim(),
+    };
+    this.close();
+    this.onSave(updated);
   }
 
   onClose(): void { this.contentEl.empty(); }
