@@ -105,8 +105,46 @@ export function validateDomainId(id: string): string | null
 
 ---
 
+## Section 4: UI-редактор доменов
+
+### `src/settings.ts` — секция «Domains»
+
+После General-секции добавляется блок со списком доменов. Для каждого домена из `settings.domains`:
+
+```
+[имя домена (id)]    [Edit]  [Delete]
+```
+
+Кнопка **Edit** открывает `EditDomainModal`. Кнопка **Delete** удаляет домен из массива и вызывает `saveSettings()` (с Notice-подтверждением в виде `new Notice(...)`).
+
+### Новый `EditDomainModal` в `src/modals.ts`
+
+Поля модального окна:
+
+| Поле | Тип ввода | Значение |
+|------|-----------|---------|
+| `name` | text | человекочитаемое название |
+| `wiki_folder` | text | путь к папке wiki |
+| `source_paths` | textarea | по одному пути на строку |
+| `entity_types` | textarea (JSON) | сырой JSON-массив |
+| `language_notes` | text | заметки о языке |
+
+При Save: `entity_types` парсится через `JSON.parse` с валидацией (должен быть массив). Если невалидный JSON — ошибка под полем, модальное окно не закрывается. `source_paths` — textarea split по `\n`, trim + filter пустых строк.
+
+### `src/i18n.ts` — новые ключи (en / ru / es)
+
+- `domains_heading` — «Domains» / «Домены» / «Dominios»
+- `editDomain` — «Edit» / «Редактировать» / «Editar»
+- `deleteDomain` — «Delete» / «Удалить» / «Eliminar»
+- `editDomainTitle` — «Edit domain» / «Редактирование домена» / «Editar dominio»
+- `entityTypesLabel` — «Entity types (JSON array)» / «Типы сущностей (JSON-массив)» / «Tipos de entidad (array JSON)»
+- `entityTypesError` — «Invalid JSON array» / «Невалидный JSON-массив» / «Array JSON inválido»
+- `sourcePathsLabel` — «Source paths (one per line)» / «Пути источников (по одному на строку)» / «Rutas de origen (una por línea)»
+- `confirmDeleteDomain` — «Delete domain "{id}"?» / «Удалить домен «{id}»?» / «¿Eliminar dominio "{id}"?»
+
+---
+
 ## Out of Scope
 
 - Автоматическая миграция данных из существующего `domain-map-<vault>.json` — не реализуется
-- UI-редактор доменов (edit/delete) — не в этой задаче
 - Изменение структуры `DomainEntry` — не в этой задаче
