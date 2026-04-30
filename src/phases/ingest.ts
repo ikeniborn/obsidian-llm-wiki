@@ -1,4 +1,4 @@
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import type OpenAI from "openai";
 import type { DomainEntry } from "../domain-map";
 import type { LlmCallOptions, RunEvent, LlmClient } from "../types";
@@ -108,6 +108,15 @@ export async function* runIngest(
   if (written.length > 0) {
     await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
     await updateIndex(vaultTools, wikiRoot, written);
+
+    const topPath = extractTopLevelSourcePath(absSource, repoRoot);
+    if (topPath) {
+      const norm = (p: string) => p.replace(/\/$/, "");
+      const alreadyCovered = (domain.source_paths ?? []).some((sp) => norm(sp) === norm(topPath));
+      if (!alreadyCovered) {
+        yield { kind: "source_path_added", domainId: domain.id, path: topPath };
+      }
+    }
   }
 
   yield {
@@ -179,6 +188,14 @@ async function updateIndex(vaultTools: VaultTools, wikiRoot: string, written: st
 
 async function tryRead(vaultTools: VaultTools, path: string): Promise<string> {
   try { return await vaultTools.read(path); } catch { return ""; }
+}
+
+export function extractTopLevelSourcePath(absSource: string, repoRoot: string): string | null {
+  const rel = relative(repoRoot, absSource);
+  const parts = rel.split("/");
+  // Need at least vaults/<vault>/<folder>/<file> (4 segments)
+  if (parts.length < 4) return null;
+  return `${parts[0]}/${parts[1]}/${parts[2]}/`;
 }
 
 function buildEntityTypesBlock(domain: DomainEntry): string {

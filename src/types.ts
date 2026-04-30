@@ -28,7 +28,8 @@ export type RunEvent =
   | { kind: "error"; message: string }
   | { kind: "exit"; code: number }
   | { kind: "ask_user"; question: string; options: string[]; toolUseId: string }
-  | { kind: "domain_created"; entry: DomainEntry };
+  | { kind: "domain_created"; entry: DomainEntry }
+  | { kind: "source_path_added"; domainId: string; path: string };
 
 export interface RunHistoryEntry {
   id: string;

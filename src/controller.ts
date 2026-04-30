@@ -170,6 +170,16 @@ export class WikiController {
           this.plugin.settings.domains.push(ev.entry);
           void this.plugin.saveSettings();
         }
+        if (ev.kind === "source_path_added") {
+          const domain = this.plugin.settings.domains.find((d) => d.id === ev.domainId);
+          if (domain) {
+            if (!domain.source_paths) domain.source_paths = [];
+            if (!domain.source_paths.includes(ev.path)) {
+              domain.source_paths.push(ev.path);
+              void this.plugin.saveSettings();
+            }
+          }
+        }
         this.collectStep(ev, steps);
         if (ev.kind === "result") finalText = ev.text;
         if (ev.kind === "error") status = "error";

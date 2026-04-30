@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runIngest } from "../../src/phases/ingest";
+import { runIngest, extractTopLevelSourcePath } from "../../src/phases/ingest";
 import { VaultTools, type VaultAdapter } from "../../src/vault-tools";
 import type { LlmClient } from "../../src/types";
 import type { DomainEntry } from "../../src/domain-map";
@@ -38,6 +38,18 @@ const domain: DomainEntry = {
   wiki_folder: "vaults/Work/!Wiki/work",
   source_paths: ["vaults/Work/Sources"],
 };
+
+describe("extractTopLevelSourcePath", () => {
+  it("extracts vaults/<vault>/<folder>/ from deep path", () => {
+    expect(extractTopLevelSourcePath("/root/vaults/Work/ИИ/sub/file.md", "/root")).toBe("vaults/Work/ИИ/");
+  });
+  it("extracts from one-level deep path", () => {
+    expect(extractTopLevelSourcePath("/root/vaults/Work/ИИ/file.md", "/root")).toBe("vaults/Work/ИИ/");
+  });
+  it("returns null for file directly in vault root", () => {
+    expect(extractTopLevelSourcePath("/root/vaults/Work/file.md", "/root")).toBeNull();
+  });
+});
 
 describe("runIngest", () => {
   it("yields error when args is empty", async () => {
@@ -81,6 +93,56 @@ describe("runIngest", () => {
       "vaults/Work/!Wiki/work/Entity.md",
       "# Entity\n\nFact.",
     );
+  });
+
+  it("yields source_path_added when new top-level folder encountered", async () => {
+    const domainWithoutPath: DomainEntry = { ...domain, source_paths: [] };
+    const adapter = mockAdapter({
+      read: vi.fn().mockResolvedValue("source text"),
+      list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+    });
+    const vt = new VaultTools(adapter, "/workspace/vault");
+    const llmResponse = JSON.stringify([
+      { path: "vaults/Work/!Wiki/work/Entity.md", content: "# Entity" },
+    ]);
+    const events = await collect(
+      runIngest(
+        ["/workspace/vault/vaults/Work/ИИ/subfolder/file.md"],
+        vt,
+        makeLlm(llmResponse),
+        "llama3.2",
+        [domainWithoutPath],
+        "/workspace/vault",
+        new AbortController().signal,
+      ),
+    );
+    const ev = events.find((e: any) => e.kind === "source_path_added") as any;
+    expect(ev).toBeDefined();
+    expect(ev.path).toBe("vaults/Work/ИИ/");
+    expect(ev.domainId).toBe("work");
+  });
+
+  it("does not yield source_path_added when path already in source_paths", async () => {
+    const adapter = mockAdapter({
+      read: vi.fn().mockResolvedValue("source text"),
+      list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+    });
+    const vt = new VaultTools(adapter, "/workspace/vault");
+    const llmResponse = JSON.stringify([
+      { path: "vaults/Work/!Wiki/work/Entity.md", content: "# Entity" },
+    ]);
+    const events = await collect(
+      runIngest(
+        ["/workspace/vault/vaults/Work/Sources/doc.md"],
+        vt,
+        makeLlm(llmResponse),
+        "llama3.2",
+        [domain],
+        "/workspace/vault",
+        new AbortController().signal,
+      ),
+    );
+    expect(events.some((e: any) => e.kind === "source_path_added")).toBe(false);
   });
 
   it("yields result with count=0 when LLM returns empty array", async () => {
