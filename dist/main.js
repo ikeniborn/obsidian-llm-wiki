@@ -695,7 +695,7 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
       return t;
     });
     const isPerOp = s.backend === "claude-agent" ? s.claudeAgent.perOperation : s.nativeAgent.perOperation;
-    if (!isPerOp) {
+    if (!isPerOp && s.backend !== "claude-agent") {
       new import_obsidian3.Setting(containerEl).setName(T.settings.maxTokens_name).setDesc(T.settings.maxTokens_desc).addText(
         (t) => t.setPlaceholder("4096").setValue(String(s.maxTokens)).onChange(async (v) => {
           const n = Number(v);
@@ -810,15 +810,6 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
             (t) => t.setValue(s.claudeAgent.operations[key].model).onChange(async (v) => {
               s.claudeAgent.operations[key].model = v.trim();
               await this.plugin.saveSettings();
-            })
-          );
-          new import_obsidian3.Setting(containerEl).setName(T.settings.opMaxTokens_name).setDesc(T.settings.opMaxTokens_desc).addText(
-            (t) => t.setValue(String(s.claudeAgent.operations[key].maxTokens)).onChange(async (v) => {
-              const n = Number(v);
-              if (Number.isFinite(n) && n > 0) {
-                s.claudeAgent.operations[key].maxTokens = Math.floor(n);
-                await this.plugin.saveSettings();
-              }
             })
           );
         }
