@@ -15,18 +15,18 @@ describe("validateDomainId", () => {
   });
 
   it("returns error string for empty id", () => {
-    expect(validateDomainId("")).not.toBeNull();
+    expect(typeof validateDomainId("")).toBe("string");
   });
 
   it("returns error string for id with slash", () => {
-    expect(validateDomainId("bad/slash")).not.toBeNull();
+    expect(typeof validateDomainId("bad/slash")).toBe("string");
   });
 
   it("returns error string for id with space", () => {
-    expect(validateDomainId("bad id")).not.toBeNull();
+    expect(typeof validateDomainId("bad id")).toBe("string");
   });
 
   it("returns error string for id with dot", () => {
-    expect(validateDomainId("bad.id")).not.toBeNull();
+    expect(typeof validateDomainId("bad.id")).toBe("string");
   });
 });
