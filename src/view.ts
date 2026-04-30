@@ -232,6 +232,7 @@ export class LlmWikiView extends ItemView {
       return;
     }
     if (ev.kind === "source_path_added") return;
+    if (ev.kind === "domain_updated") { this.refreshDomains(); return; }
     this.stepCount++;
     if (ev.kind === "tool_use") {
       this.toolCount++;

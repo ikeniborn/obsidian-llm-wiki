@@ -170,6 +170,14 @@ export class WikiController {
           this.plugin.settings.domains.push(ev.entry);
           void this.plugin.saveSettings();
         }
+        if (ev.kind === "domain_updated") {
+          const domain = this.plugin.settings.domains.find((d) => d.id === ev.domainId);
+          if (domain) {
+            if (ev.patch.entity_types !== undefined) domain.entity_types = ev.patch.entity_types;
+            if (ev.patch.language_notes !== undefined) domain.language_notes = ev.patch.language_notes;
+            void this.plugin.saveSettings();
+          }
+        }
         if (ev.kind === "source_path_added") {
           const domain = this.plugin.settings.domains.find((d) => d.id === ev.domainId);
           if (domain) {
