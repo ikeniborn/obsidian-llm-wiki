@@ -178,16 +178,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName(T.settings.jsonSchema_name)
-        .setDesc(T.settings.jsonSchema_desc)
-        .addTextArea((t) => {
-          t.inputEl.addClass("llm-wiki-settings-textarea");
-          t.setValue(s.claudeAgent.jsonSchema)
-            .onChange(async (v) => { s.claudeAgent.jsonSchema = v.trim(); await this.plugin.saveSettings(); });
-          return t;
-        });
-
-      new Setting(containerEl)
         .setName(T.settings.perOperation_name)
         .setDesc(T.settings.perOperation_desc)
         .addToggle((t) =>

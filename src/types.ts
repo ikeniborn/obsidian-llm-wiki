@@ -100,7 +100,6 @@ export interface LlmWikiPluginSettings {
     model: string;
     spawnCwd: string;
     allowedTools: string;
-    jsonSchema: string;
     perOperation: boolean;
     operations: OpMap<ClaudeOperationConfig>;
   };
@@ -130,7 +129,6 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
     model: "sonnet",
     spawnCwd: "/tmp",
     allowedTools: "",
-    jsonSchema: "",
     perOperation: false,
     operations: {
       ingest: { model: "haiku",  maxTokens: 4096 },

@@ -40,7 +40,6 @@ var DEFAULT_SETTINGS = {
     model: "sonnet",
     spawnCwd: "/tmp",
     allowedTools: "",
-    jsonSchema: "",
     perOperation: false,
     operations: {
       ingest: { model: "haiku", maxTokens: 4096 },
@@ -117,8 +116,6 @@ var en = {
     spawnCwd_desc: "Directory where the claude process is launched. Use /tmp to prevent loading project CLAUDE.md.",
     allowedTools_name: "Allowed tools",
     allowedTools_desc: "Comma-separated list passed to --tools. Empty \u2014 no restriction.",
-    jsonSchema_name: "JSON schema (--json-schema)",
-    jsonSchema_desc: "JSON schema string for structured output validation. Empty \u2014 disabled.",
     perOperation_name: "Per-operation models",
     perOperation_desc: "Configure separate model and parameters for each operation.",
     op_ingest: "Ingest",
@@ -245,8 +242,6 @@ var ru = {
     spawnCwd_desc: "\u0414\u0438\u0440\u0435\u043A\u0442\u043E\u0440\u0438\u044F \u0437\u0430\u043F\u0443\u0441\u043A\u0430 \u043F\u0440\u043E\u0446\u0435\u0441\u0441\u0430 claude. /tmp \u043F\u0440\u0435\u0434\u043E\u0442\u0432\u0440\u0430\u0449\u0430\u0435\u0442 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0443 CLAUDE.md \u043F\u0440\u043E\u0435\u043A\u0442\u0430.",
     allowedTools_name: "\u0420\u0430\u0437\u0440\u0435\u0448\u0451\u043D\u043D\u044B\u0435 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
     allowedTools_desc: "\u0421\u043F\u0438\u0441\u043E\u043A \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E \u0434\u043B\u044F --tools. \u041F\u0443\u0441\u0442\u043E \u2014 \u0431\u0435\u0437 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439.",
-    jsonSchema_name: "JSON schema (--json-schema)",
-    jsonSchema_desc: "JSON-\u0441\u0445\u0435\u043C\u0430 \u0434\u043B\u044F \u0432\u0430\u043B\u0438\u0434\u0430\u0446\u0438\u0438 \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u0433\u043E \u0432\u044B\u0432\u043E\u0434\u0430. \u041F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E.",
     perOperation_name: "\u041C\u043E\u0434\u0435\u043B\u0438 \u043F\u043E \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F\u043C",
     perOperation_desc: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043C\u043E\u0434\u0435\u043B\u044C \u0438 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u0434\u043B\u044F \u043A\u0430\u0436\u0434\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.",
     op_ingest: "Ingest",
@@ -373,8 +368,6 @@ var es = {
     spawnCwd_desc: "Directorio donde se lanza el proceso claude. /tmp evita cargar CLAUDE.md del proyecto.",
     allowedTools_name: "Herramientas permitidas",
     allowedTools_desc: "Lista separada por comas para --tools. Vac\xEDo \u2014 sin restricci\xF3n.",
-    jsonSchema_name: "JSON schema (--json-schema)",
-    jsonSchema_desc: "Esquema JSON para validaci\xF3n de salida estructurada. Vac\xEDo \u2014 desactivado.",
     perOperation_name: "Modelos por operaci\xF3n",
     perOperation_desc: "Configurar modelo y par\xE1metros separados para cada operaci\xF3n.",
     op_ingest: "Ingest",
@@ -829,14 +822,6 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
           })
         )
       );
-      new import_obsidian3.Setting(containerEl).setName(T.settings.jsonSchema_name).setDesc(T.settings.jsonSchema_desc).addTextArea((t) => {
-        t.inputEl.addClass("llm-wiki-settings-textarea");
-        t.setValue(s.claudeAgent.jsonSchema).onChange(async (v) => {
-          s.claudeAgent.jsonSchema = v.trim();
-          await this.plugin.saveSettings();
-        });
-        return t;
-      });
       new import_obsidian3.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
         (t) => t.setValue(s.claudeAgent.perOperation).onChange(async (v) => {
           s.claudeAgent.perOperation = v;
@@ -2587,8 +2572,6 @@ var ClaudeCliClient = class {
     args.push("--dangerously-skip-permissions");
     if (this.cfg.allowedTools)
       args.push("--tools", this.cfg.allowedTools);
-    if (this.cfg.jsonSchema)
-      args.push("--json-schema", this.cfg.jsonSchema);
     if (systemContent)
       args.push("--system-prompt", systemContent);
     if (params.stream) {
