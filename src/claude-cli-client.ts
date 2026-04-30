@@ -10,6 +10,7 @@ export interface ClaudeCliConfig {
   requestTimeoutSec: number;
   cwd?: string;
   allowedTools?: string;
+  jsonSchema?: string;
 }
 
 const SIGTERM_GRACE_MS = 3000;
@@ -49,7 +50,9 @@ export class ClaudeCliClient implements LlmClient {
     if (model) args.push("--model", model);
     args.push("--", "-p", userText, "--output-format", "stream-json", "--verbose");
     args.push("--disable-slash-commands");
+    args.push("--dangerously-skip-permissions");
     if (this.cfg.allowedTools) args.push("--tools", this.cfg.allowedTools);
+    if (this.cfg.jsonSchema) args.push("--json-schema", this.cfg.jsonSchema);
     if (systemContent) args.push("--system-prompt", systemContent);
 
     if ((params as { stream?: boolean }).stream) {

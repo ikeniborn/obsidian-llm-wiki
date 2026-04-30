@@ -145,6 +145,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
             .onChange(async (v) => { s.claudeAgent.iclaudePath = v.trim(); await this.plugin.saveSettings(); }),
         );
 
+      new Setting(containerEl)
+        .setName(T.settings.spawnCwd_name)
+        .setDesc(T.settings.spawnCwd_desc)
+        .addText((t) =>
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          t.setPlaceholder("/tmp")
+            .setValue(s.claudeAgent.spawnCwd)
+            .onChange(async (v) => { s.claudeAgent.spawnCwd = v.trim() || "/tmp"; await this.plugin.saveSettings(); }),
+        );
+
       if (!s.claudeAgent.perOperation) {
         new Setting(containerEl)
           .setName(T.settings.model_name)
@@ -166,6 +176,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
             .setValue(s.claudeAgent.allowedTools)
             .onChange(async (v) => { s.claudeAgent.allowedTools = v.trim(); await this.plugin.saveSettings(); }),
         );
+
+      new Setting(containerEl)
+        .setName(T.settings.jsonSchema_name)
+        .setDesc(T.settings.jsonSchema_desc)
+        .addTextArea((t) => {
+          t.inputEl.addClass("llm-wiki-settings-textarea");
+          t.setValue(s.claudeAgent.jsonSchema)
+            .onChange(async (v) => { s.claudeAgent.jsonSchema = v.trim(); await this.plugin.saveSettings(); });
+          return t;
+        });
 
       new Setting(containerEl)
         .setName(T.settings.perOperation_name)
