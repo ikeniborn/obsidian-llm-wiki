@@ -47,6 +47,10 @@ export class WikiController {
     await this.dispatch("init", args);
   }
 
+  async fix(domain: string): Promise<void> {
+    await this.dispatch("fix", [domain]);
+  }
+
   cwdOrEmpty(): string {
     return (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
   }

@@ -99,13 +99,17 @@ export async function* runLint(
     if (signal.aborted) return;
     yield { kind: "assistant_text", delta: `\nActualizing domain config for "${domain.id}"...\n` };
     const patch = await actualizeDomainConfig(domain, pages, llm, model, opts, signal);
-    if (patch) yield { kind: "domain_updated", domainId: domain.id, patch };
+    if (patch) {
+      const diffReport = computeEntityDiff(domain.entity_types ?? [], patch.entity_types ?? domain.entity_types ?? []);
+      reportParts.push(diffReport);
+      yield { kind: "domain_updated", domainId: domain.id, patch };
+    }
   }
 
   yield { kind: "result", durationMs: Date.now() - start, text: reportParts.join("\n\n---\n\n") };
 }
 
-function checkStructure(pages: Map<string, string>): string {
+export function checkStructure(pages: Map<string, string>): string {
   const issues: string[] = [];
   for (const [path, content] of pages) {
     if (!content.startsWith("---")) {
@@ -125,6 +129,23 @@ function buildEntityTypesBlock(domain: DomainEntry): string {
   return domain.entity_types
     .map((et) => `- ${et.type}: ${et.description}`)
     .join("\n");
+}
+
+function computeEntityDiff(oldTypes: EntityType[], newTypes: EntityType[]): string {
+  const oldMap = new Map(oldTypes.map((et) => [et.type, et]));
+  const newMap = new Map(newTypes.map((et) => [et.type, et]));
+  const added = newTypes.filter((et) => !oldMap.has(et.type));
+  const removed = oldTypes.filter((et) => !newMap.has(et.type));
+  const modified = newTypes.filter((et) => {
+    const old = oldMap.get(et.type);
+    return old && JSON.stringify(old) !== JSON.stringify(et);
+  });
+  if (!added.length && !removed.length && !modified.length) return "### Изменения entity_types\nИзменений нет.";
+  const lines = ["### Изменения entity_types"];
+  added.forEach((et) => lines.push(`- ✚ добавлен: **${et.type}**`));
+  removed.forEach((et) => lines.push(`- ✖ удалён: **${et.type}**`));
+  modified.forEach((et) => lines.push(`- ✎ обновлён: **${et.type}**`));
+  return lines.join("\n");
 }
 
 async function actualizeDomainConfig(

@@ -6,7 +6,8 @@ export type WikiOperation =
   | "query"
   | "query-save"
   | "lint"
-  | "init";
+  | "init"
+  | "fix";
 
 export type WikiDomain = string;
 
@@ -67,7 +68,7 @@ export type LlmClient = {
   };
 };
 
-export type OpKey = "ingest" | "query" | "lint" | "init";
+export type OpKey = "ingest" | "query" | "lint" | "init" | "fix";
 export type OpMap<T> = Record<OpKey, T>;
 
 export interface ClaudeOperationConfig {
@@ -93,6 +94,7 @@ export interface LlmWikiPluginSettings {
     query: number;
     lint: number;
     init: number;
+    fix: number;
   };
   history: RunHistoryEntry[];
   claudeAgent: {
@@ -120,7 +122,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
+  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600, fix: 300 },
   history: [],
   claudeAgent: {
     iclaudePath: "",
@@ -131,6 +133,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
       query:  { model: "sonnet", maxTokens: 4096 },
       lint:   { model: "haiku",  maxTokens: 4096 },
       init:   { model: "sonnet", maxTokens: 8192 },
+      fix:    { model: "sonnet", maxTokens: 8192 },
     },
   },
   nativeAgent: {
@@ -146,6 +149,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
       query:  { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
       lint:   { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
       init:   { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
+      fix:    { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
     },
   },
 };

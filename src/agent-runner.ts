@@ -3,6 +3,7 @@ import { runIngest } from "./phases/ingest";
 import { runQuery } from "./phases/query";
 import { runLint } from "./phases/lint";
 import { runInit } from "./phases/init";
+import { runFix } from "./phases/fix";
 import type { LlmCallOptions, LlmClient, LlmWikiPluginSettings, OpKey, RunEvent, RunRequest } from "./types";
 import type { VaultTools } from "./vault-tools";
 
@@ -61,6 +62,9 @@ export class AgentRunner {
         break;
       case "init":
         yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
+        break;
+      case "fix":
+        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       default: {
         const start = Date.now();
