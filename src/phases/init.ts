@@ -50,7 +50,7 @@ export async function* runInit(
     `  "id": "${domainId}",`,
     `  "name": "Человекочитаемое название",`,
     `  "wiki_folder": "vaults/${vaultName}/!Wiki/${domainId}",`,
-    `  "source_paths": ["relative/source/path"],`,
+    `  "source_paths": ["vaults/${vaultName}/<Папка источника>/"],`,
     `  "entity_types": [{"type":"...","description":"...","extraction_cues":["..."],"min_mentions_for_page":1,"wiki_subfolder":"${domainId}/..."}],`,
     `  "language_notes": ""`,
     `}`,
