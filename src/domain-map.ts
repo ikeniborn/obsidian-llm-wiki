@@ -18,8 +18,7 @@ export interface DomainEntry {
 export interface AddDomainInput {
   id: string;
   name: string;
-  wikiFolder: string;
-  sourcePaths: string[];
+  wikiFolder: string;  // vault-relative, e.g. "!Wiki/os" (without "vaults/VaultName/")
 }
 
 /** Returns null if id is valid, or an error message string. */

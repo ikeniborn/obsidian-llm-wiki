@@ -107,16 +107,10 @@ export class DomainModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
-/** Дефолтный source_paths для нового домена — папка wiki_folder. */
-export function defaultSourcePaths(wikiFolder: string): string[] {
-  return wikiFolder ? [wikiFolder] : [];
-}
 
 export class AddDomainModal extends Modal {
-  private input: AddDomainInput = { id: "", name: "", wikiFolder: "", sourcePaths: [] };
+  private input: AddDomainInput = { id: "", name: "", wikiFolder: "" };
   private wikiFolderInput: { setValue: (v: string) => void } | null = null;
-  private sourcePathsInput: { setValue: (v: string) => void } | null = null;
-  private sourcePathsTouched = false;
 
   constructor(
     app: App,
@@ -138,12 +132,7 @@ export class AddDomainModal extends Modal {
         t.setPlaceholder(T.idPlaceholder).onChange((v) => {
           this.input.id = v.trim();
           if (this.wikiFolderInput && !this.input.wikiFolder) {
-            const auto = `${this.wikiRoot}/${this.input.id}`;
-            this.wikiFolderInput.setValue(auto);
-            if (!this.sourcePathsTouched && this.sourcePathsInput) {
-              this.sourcePathsInput.setValue(auto);
-              this.input.sourcePaths = defaultSourcePaths(auto);
-            }
+            this.wikiFolderInput.setValue(`${this.wikiRoot}/${this.input.id}`);
           }
         }),
       );
@@ -158,23 +147,8 @@ export class AddDomainModal extends Modal {
       .addText((t) => {
         t.setPlaceholder(T.wikiFolder_placeholder(this.wikiRoot)).onChange((v) => {
           this.input.wikiFolder = v.trim();
-          if (!this.sourcePathsTouched && this.sourcePathsInput) {
-            this.sourcePathsInput.setValue(v.trim());
-            this.input.sourcePaths = defaultSourcePaths(v.trim());
-          }
         });
         this.wikiFolderInput = t;
-      });
-
-    new Setting(contentEl)
-      .setName(T.sourcePaths_name)
-      .setDesc(T.sourcePaths_desc)
-      .addText((t) => {
-        t.setPlaceholder(T.sourcePaths_placeholder).onChange((v) => {
-          this.sourcePathsTouched = true;
-          this.input.sourcePaths = v.split(",").map((s) => s.trim()).filter(Boolean);
-        });
-        this.sourcePathsInput = t;
       });
 
     contentEl.createEl("p", { text: T.addDomainNote, cls: "muted" });
@@ -227,7 +201,6 @@ export class EditDomainModal extends Modal {
 
     new Setting(contentEl)
       .setName(T.sourcePathsLabel)
-      .setDesc(T.sourcePaths_desc)
       .addTextArea((t) => {
         t.inputEl.rows = 4;
         t.inputEl.style.width = "100%";

@@ -71,13 +71,13 @@ export class WikiController {
       return { ok: false, error: msg };
     }
     const vaultName = this.app.vault.getName();
-    const wikiRoot = `vaults/${vaultName}/!Wiki`;
-    const wikiFolder = input.wikiFolder.trim() || `${wikiRoot}/${id}`;
+    const vaultPrefix = `vaults/${vaultName}`;
+    const wikiRelative = input.wikiFolder.trim() || `!Wiki/${id}`;
     s.domains.push({
       id,
       name: input.name.trim() || id,
-      wiki_folder: wikiFolder,
-      source_paths: input.sourcePaths.map((p) => p.trim()).filter(Boolean),
+      wiki_folder: `${vaultPrefix}/${wikiRelative}`,
+      source_paths: [],
       entity_types: [],
       language_notes: "",
     });
