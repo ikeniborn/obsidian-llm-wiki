@@ -92,7 +92,7 @@ export class WikiController {
     return p;
   }
 
-  private buildAgentRunner(): AgentRunner {
+  private buildAgentRunner(repoRoot: string): AgentRunner {
     const adapter = this.app.vault.adapter as unknown as VaultAdapter;
     const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     const vaultTools = new VaultTools(adapter, base);
@@ -102,7 +102,7 @@ export class WikiController {
 
     const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
     const llm = s.backend === "claude-agent"
-      ? new ClaudeCliClient({ ...s.claudeAgent, requestTimeoutSec: maxTimeoutSec })
+      ? new ClaudeCliClient({ ...s.claudeAgent, requestTimeoutSec: maxTimeoutSec, cwd: repoRoot })
       : new OpenAI({
           baseURL: s.nativeAgent.baseUrl,
           apiKey: s.nativeAgent.apiKey,
@@ -138,7 +138,14 @@ export class WikiController {
     const view = this.activeView();
     if (!view) return;
 
-    const agentRunner = this.buildAgentRunner();
+    const vaultBasePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+    const vaultName = this.app.vault.getName();
+    const vaultSuffix = `/vaults/${vaultName}`;
+    const repoRoot = vaultBasePath.endsWith(vaultSuffix)
+      ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length)
+      : vaultBasePath;
+
+    const agentRunner = this.buildAgentRunner(repoRoot);
 
     const ctrl = new AbortController();
     this.current = ctrl;
@@ -151,13 +158,6 @@ export class WikiController {
 
     this.logEvent(sessionId, op, domainId, { kind: "system", message: `start op=${op} args=${JSON.stringify(args)} domainId=${domainId ?? ""}` });
     view.setRunning(op, args);
-
-    const vaultBasePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    const vaultName = this.app.vault.getName();
-    const vaultSuffix = `/vaults/${vaultName}`;
-    const repoRoot = vaultBasePath.endsWith(vaultSuffix)
-      ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length)
-      : vaultBasePath;
 
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1000;
     const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });

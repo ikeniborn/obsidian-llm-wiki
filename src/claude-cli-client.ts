@@ -8,6 +8,8 @@ export interface ClaudeCliConfig {
   iclaudePath: string;
   model: string;
   requestTimeoutSec: number;
+  cwd?: string;
+  allowedTools?: string;
 }
 
 const SIGTERM_GRACE_MS = 3000;
@@ -46,6 +48,8 @@ export class ClaudeCliClient implements LlmClient {
     const args: string[] = ["--no-proxy"];
     if (model) args.push("--model", model);
     args.push("--", "-p", userText, "--output-format", "stream-json", "--verbose");
+    args.push("--disable-slash-commands");
+    if (this.cfg.allowedTools) args.push("--tools", this.cfg.allowedTools);
     if (systemContent) args.push("--system-prompt", systemContent);
 
     if ((params as { stream?: boolean }).stream) {
@@ -67,7 +71,7 @@ export class ClaudeCliClient implements LlmClient {
     signal: AbortSignal | undefined,
     timeoutSec: number,
   ): AsyncGenerator<OpenAI.Chat.ChatCompletionChunk> {
-    const child = spawn(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"], cwd: this.cfg.cwd || undefined });
     if (!child.stdout || !child.stderr) throw new Error("spawn: missing stdio");
     const stderrChunks: Buffer[] = [];
     child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));

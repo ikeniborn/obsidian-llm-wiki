@@ -38,6 +38,7 @@ var DEFAULT_SETTINGS = {
   claudeAgent: {
     iclaudePath: "",
     model: "sonnet",
+    allowedTools: "",
     perOperation: false,
     operations: {
       ingest: { model: "haiku", maxTokens: 4096 },
@@ -110,6 +111,8 @@ var en = {
     topP_desc: "0.0\u20131.0, or empty \u2014 disable.",
     numCtx_name: "Context window",
     numCtx_desc: "Context size (num_ctx). Empty \u2014 model default.",
+    allowedTools_name: "Allowed tools",
+    allowedTools_desc: "Comma-separated list passed to --tools. Empty \u2014 no restriction.",
     perOperation_name: "Per-operation models",
     perOperation_desc: "Configure separate model and parameters for each operation.",
     op_ingest: "Ingest",
@@ -232,6 +235,8 @@ var ru = {
     topP_desc: "0.0\u20131.0, \u0438\u043B\u0438 \u043F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C.",
     numCtx_name: "\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u043E\u0435 \u043E\u043A\u043D\u043E",
     numCtx_desc: "\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0430 (num_ctx). \u041F\u0443\u0441\u0442\u043E \u2014 \u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438.",
+    allowedTools_name: "\u0420\u0430\u0437\u0440\u0435\u0448\u0451\u043D\u043D\u044B\u0435 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
+    allowedTools_desc: "\u0421\u043F\u0438\u0441\u043E\u043A \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E \u0434\u043B\u044F --tools. \u041F\u0443\u0441\u0442\u043E \u2014 \u0431\u0435\u0437 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439.",
     perOperation_name: "\u041C\u043E\u0434\u0435\u043B\u0438 \u043F\u043E \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F\u043C",
     perOperation_desc: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043C\u043E\u0434\u0435\u043B\u044C \u0438 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u0434\u043B\u044F \u043A\u0430\u0436\u0434\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.",
     op_ingest: "Ingest",
@@ -354,6 +359,8 @@ var es = {
     topP_desc: "0.0\u20131.0, o vac\xEDo \u2014 desactivar.",
     numCtx_name: "Ventana de contexto",
     numCtx_desc: "Tama\xF1o del contexto (num_ctx). Vac\xEDo \u2014 valor por defecto del modelo.",
+    allowedTools_name: "Herramientas permitidas",
+    allowedTools_desc: "Lista separada por comas para --tools. Vac\xEDo \u2014 sin restricci\xF3n.",
     perOperation_name: "Modelos por operaci\xF3n",
     perOperation_desc: "Configurar modelo y par\xE1metros separados para cada operaci\xF3n.",
     op_ingest: "Ingest",
@@ -790,6 +797,15 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
           )
         );
       }
+      new import_obsidian3.Setting(containerEl).setName(T.settings.allowedTools_name).setDesc(T.settings.allowedTools_desc).addText(
+        (t) => (
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          t.setPlaceholder("Bash,Read,Write").setValue(s.claudeAgent.allowedTools).onChange(async (v) => {
+            s.claudeAgent.allowedTools = v.trim();
+            await this.plugin.saveSettings();
+          })
+        )
+      );
       new import_obsidian3.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
         (t) => t.setValue(s.claudeAgent.perOperation).onChange(async (v) => {
           s.claudeAgent.perOperation = v;
@@ -2536,6 +2552,9 @@ var ClaudeCliClient = class {
     if (model)
       args.push("--model", model);
     args.push("--", "-p", userText, "--output-format", "stream-json", "--verbose");
+    args.push("--disable-slash-commands");
+    if (this.cfg.allowedTools)
+      args.push("--tools", this.cfg.allowedTools);
     if (systemContent)
       args.push("--system-prompt", systemContent);
     if (params.stream) {
@@ -2547,7 +2566,7 @@ var ClaudeCliClient = class {
     return { [Symbol.asyncIterator]: () => this._generate(args, signal, timeoutSec) };
   }
   async *_generate(args, signal, timeoutSec) {
-    const child = (0, import_node_child_process.spawn)(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = (0, import_node_child_process.spawn)(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"], cwd: this.cfg.cwd || void 0 });
     if (!child.stdout || !child.stderr)
       throw new Error("spawn: missing stdio");
     const stderrChunks = [];
@@ -9897,7 +9916,7 @@ var WikiController = class {
     }
     return p;
   }
-  buildAgentRunner() {
+  buildAgentRunner(repoRoot) {
     const adapter = this.app.vault.adapter;
     const base = this.app.vault.adapter.getBasePath?.() ?? "";
     const vaultTools = new VaultTools(adapter, base);
@@ -9905,7 +9924,7 @@ var WikiController = class {
     const domains = this.plugin.settings.domains ?? [];
     const s = this.plugin.settings;
     const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
-    const llm = s.backend === "claude-agent" ? new ClaudeCliClient({ ...s.claudeAgent, requestTimeoutSec: maxTimeoutSec }) : new OpenAI({
+    const llm = s.backend === "claude-agent" ? new ClaudeCliClient({ ...s.claudeAgent, requestTimeoutSec: maxTimeoutSec, cwd: repoRoot }) : new OpenAI({
       baseURL: s.nativeAgent.baseUrl,
       apiKey: s.nativeAgent.apiKey,
       timeout: maxTimeoutSec * 1e3,
@@ -9938,7 +9957,11 @@ var WikiController = class {
     const view = this.activeView();
     if (!view)
       return;
-    const agentRunner = this.buildAgentRunner();
+    const vaultBasePath = this.app.vault.adapter.getBasePath?.() ?? "";
+    const vaultName = this.app.vault.getName();
+    const vaultSuffix = `/vaults/${vaultName}`;
+    const repoRoot = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
+    const agentRunner = this.buildAgentRunner(repoRoot);
     const ctrl = new AbortController();
     this.current = ctrl;
     const startedAt = Date.now();
@@ -9948,10 +9971,6 @@ var WikiController = class {
     let status = "done";
     this.logEvent(sessionId, op, domainId, { kind: "system", message: `start op=${op} args=${JSON.stringify(args)} domainId=${domainId ?? ""}` });
     view.setRunning(op, args);
-    const vaultBasePath = this.app.vault.adapter.getBasePath?.() ?? "";
-    const vaultName = this.app.vault.getName();
-    const vaultSuffix = `/vaults/${vaultName}`;
-    const repoRoot = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1e3;
     const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
     try {

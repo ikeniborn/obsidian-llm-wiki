@@ -158,6 +158,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       }
 
       new Setting(containerEl)
+        .setName(T.settings.allowedTools_name)
+        .setDesc(T.settings.allowedTools_desc)
+        .addText((t) =>
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          t.setPlaceholder("Bash,Read,Write")
+            .setValue(s.claudeAgent.allowedTools)
+            .onChange(async (v) => { s.claudeAgent.allowedTools = v.trim(); await this.plugin.saveSettings(); }),
+        );
+
+      new Setting(containerEl)
         .setName(T.settings.perOperation_name)
         .setDesc(T.settings.perOperation_desc)
         .addToggle((t) =>

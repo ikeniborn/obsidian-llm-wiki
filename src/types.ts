@@ -98,6 +98,7 @@ export interface LlmWikiPluginSettings {
   claudeAgent: {
     iclaudePath: string;
     model: string;
+    allowedTools: string;
     perOperation: boolean;
     operations: OpMap<ClaudeOperationConfig>;
   };
@@ -125,6 +126,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   claudeAgent: {
     iclaudePath: "",
     model: "sonnet",
+    allowedTools: "",
     perOperation: false,
     operations: {
       ingest: { model: "haiku",  maxTokens: 4096 },
