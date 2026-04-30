@@ -333,9 +333,6 @@ export class LlmWikiView extends ItemView {
     this.lintBtn.disabled = false;
     this.updateInitBtn();
     if (this.tickHandle !== null) { window.clearInterval(this.tickHandle); this.tickHandle = null; }
-    this.stepsOpen = false;
-    this.stepsEl.addClass("llm-wiki-hidden");
-    this.progressToggle.setText("▶");
     this.updateMetrics();
     this.finalEl.empty();
     if (entry.finalText) {

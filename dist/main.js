@@ -1281,9 +1281,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       window.clearInterval(this.tickHandle);
       this.tickHandle = null;
     }
-    this.stepsOpen = false;
-    this.stepsEl.addClass("llm-wiki-hidden");
-    this.progressToggle.setText("\u25B6");
     this.updateMetrics();
     this.finalEl.empty();
     if (entry.finalText) {
