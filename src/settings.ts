@@ -1,4 +1,5 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { EditDomainModal } from "./modals";
 import type LlmWikiPlugin from "./main";
 import type { LlmWikiPluginSettings, OpKey } from "./types";
 import { i18n } from "./i18n";
@@ -43,15 +44,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName(T.settings.domainMapDir_name)
-      .setDesc(T.settings.domainMapDir_desc)
-      .addText((t) =>
-        t.setPlaceholder(T.settings.domainMapDir_placeholder)
-          .setValue(s.domainMapDir)
-          .onChange(async (v) => { s.domainMapDir = v.trim(); await this.plugin.saveSettings(); }),
-      );
-
-    new Setting(containerEl)
       .setName(T.settings.timeouts_name)
       .setDesc(T.settings.timeouts_desc)
       .addText((t) =>
@@ -84,6 +76,41 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           .setValue(s.agentLogPath)
           .onChange(async (v) => { s.agentLogPath = v.trim(); await this.plugin.saveSettings(); }),
       );
+
+    // ── Domains ───────────────────────────────────────────────────────────────
+    new Setting(containerEl).setName(T.settings.domains_heading).setHeading();
+
+    const domains = s.domains ?? [];
+    if (domains.length === 0) {
+      containerEl.createEl("p", {
+        text: "No domains. Add a domain via the sidebar panel (Add domain button).",
+        cls: "setting-item-description",
+      });
+    } else {
+      for (let i = 0; i < domains.length; i++) {
+        const d = domains[i];
+        new Setting(containerEl)
+          .setName(`${d.name || d.id}`)
+          .setDesc(d.id)
+          .addButton((b) =>
+            b.setButtonText(T.settings.editDomain).onClick(() => {
+              new EditDomainModal(this.plugin.app, d, async (updated) => {
+                s.domains[i] = updated;
+                await this.plugin.saveSettings();
+                this.display();
+              }).open();
+            }),
+          )
+          .addButton((b) =>
+            b.setButtonText(T.settings.deleteDomain).setWarning().onClick(async () => {
+              s.domains.splice(i, 1);
+              await this.plugin.saveSettings();
+              new Notice(T.settings.domainDeleted(d.id));
+              this.display();
+            }),
+          );
+      }
+    }
 
     // ── Backend settings ───────────────────────────────────────────────────
     new Setting(containerEl).setName(T.settings.h3_backend).setHeading();
