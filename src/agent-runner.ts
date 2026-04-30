@@ -13,7 +13,6 @@ export class AgentRunner {
     private vaultTools: VaultTools,
     private vaultName: string,
     private domains: DomainEntry[],
-    private domainMapDir: string = "",
   ) {}
 
   private buildOptsFor(op: RunRequest["operation"]): { model: string; opts: LlmCallOptions } {
@@ -61,7 +60,7 @@ export class AgentRunner {
         yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       case "init":
-        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, this.domainMapDir, req.signal, opts);
+        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
         break;
       default: {
         const start = Date.now();
