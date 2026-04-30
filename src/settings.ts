@@ -103,9 +103,9 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           )
           .addButton((b) =>
             b.setButtonText(T.settings.deleteDomain).setWarning().onClick(async () => {
+              new Notice(T.settings.confirmDeleteDomain(d.id));
               s.domains.splice(i, 1);
               await this.plugin.saveSettings();
-              new Notice(T.settings.domainDeleted(d.id));
               this.display();
             }),
           );
