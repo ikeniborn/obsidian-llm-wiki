@@ -1612,6 +1612,11 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
   const pages = parseJsonPages(fullText);
   const written = [];
   for (const page of pages) {
+    if (!page.path.startsWith(wikiVaultPath + "/")) {
+      yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+      yield { kind: "tool_result", ok: false, preview: `Blocked: path outside wiki folder (${wikiVaultPath})` };
+      continue;
+    }
     yield { kind: "tool_use", name: "Write", input: { path: page.path } };
     try {
       await vaultTools.write(page.path, page.content);
@@ -2044,6 +2049,11 @@ Applying fixes for "${domain.id}"...
     const fixedPages = parseJsonPages(fixFullText);
     const writtenPaths = [];
     for (const page of fixedPages) {
+      if (!page.path.startsWith(wikiVaultPath + "/")) {
+        yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+        yield { kind: "tool_result", ok: false, preview: `Blocked: path outside wiki folder (${wikiVaultPath})` };
+        continue;
+      }
       yield { kind: "tool_use", name: "Write", input: { path: page.path } };
       try {
         await vaultTools.write(page.path, page.content);

@@ -94,6 +94,11 @@ export async function* runIngest(
   const pages = parseJsonPages(fullText);
   const written: string[] = [];
   for (const page of pages) {
+    if (!page.path.startsWith(wikiVaultPath + "/")) {
+      yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+      yield { kind: "tool_result", ok: false, preview: `Blocked: path outside wiki folder (${wikiVaultPath})` };
+      continue;
+    }
     yield { kind: "tool_use", name: "Write", input: { path: page.path } };
     try {
       await vaultTools.write(page.path, page.content);
