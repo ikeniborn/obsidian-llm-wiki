@@ -1,5 +1,6 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { DEFAULT_SETTINGS, type LlmWikiPluginSettings, type RunHistoryEntry } from "./types";
+import type { DomainEntry } from "./domain-map";
 import { LlmWikiSettingTab } from "./settings";
 import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
 import { WikiController } from "./controller";
@@ -127,13 +128,12 @@ export default class LlmWikiPlugin extends Plugin {
         },
       },
       history: (data?.history as RunHistoryEntry[]) ?? [],
+      domains: Array.isArray(data?.domains) ? (data.domains as DomainEntry[]) : [],
     } as LlmWikiPluginSettings;
 
     // Миграция: поля, перенесённые с per-backend уровня на top-level (schema v2)
     if (!data?.systemPrompt && (caData.systemPrompt || naData.systemPrompt))
       this.settings.systemPrompt = (caData.systemPrompt ?? naData.systemPrompt) as string;
-    if (!data?.domainMapDir && (caData.domainMapDir || naData.domainMapDir))
-      this.settings.domainMapDir = (caData.domainMapDir ?? naData.domainMapDir) as string;
     if (!data?.maxTokens && (caData.maxTokens || naData.maxTokens))
       this.settings.maxTokens = (caData.maxTokens ?? naData.maxTokens) as number;
 
