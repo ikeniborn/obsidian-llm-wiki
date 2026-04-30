@@ -102,7 +102,7 @@ export class WikiController {
 
     const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
     const llm = s.backend === "claude-agent"
-      ? new ClaudeCliClient({ ...s.claudeAgent, maxTokens: s.maxTokens, requestTimeoutSec: maxTimeoutSec })
+      ? new ClaudeCliClient({ ...s.claudeAgent, requestTimeoutSec: maxTimeoutSec })
       : new OpenAI({
           baseURL: s.nativeAgent.baseUrl,
           apiKey: s.nativeAgent.apiKey,

@@ -2540,12 +2540,11 @@ var ClaudeCliClient = class {
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
     const model = params.model || this.cfg.model;
-    const { maxTokens, requestTimeoutSec } = this.cfg;
-    const args = ["-p", userText, "--output-format", "stream-json", "--verbose"];
+    const { requestTimeoutSec } = this.cfg;
+    const args = ["--no-proxy"];
     if (model)
       args.push("--model", model);
-    if (maxTokens)
-      args.push("--max-tokens", String(maxTokens));
+    args.push("--", "-p", userText, "--output-format", "stream-json", "--verbose");
     if (systemContent)
       args.push("--system-prompt", systemContent);
     if (params.stream) {
@@ -9915,7 +9914,7 @@ var WikiController = class {
     const domains = this.plugin.settings.domains ?? [];
     const s = this.plugin.settings;
     const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
-    const llm = s.backend === "claude-agent" ? new ClaudeCliClient({ ...s.claudeAgent, maxTokens: s.maxTokens, requestTimeoutSec: maxTimeoutSec }) : new OpenAI({
+    const llm = s.backend === "claude-agent" ? new ClaudeCliClient({ ...s.claudeAgent, requestTimeoutSec: maxTimeoutSec }) : new OpenAI({
       baseURL: s.nativeAgent.baseUrl,
       apiKey: s.nativeAgent.apiKey,
       timeout: maxTimeoutSec * 1e3,

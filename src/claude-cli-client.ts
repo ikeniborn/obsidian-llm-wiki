@@ -7,7 +7,6 @@ import type { LlmClient } from "./types";
 export interface ClaudeCliConfig {
   iclaudePath: string;
   model: string;
-  maxTokens: number;
   requestTimeoutSec: number;
 }
 
@@ -42,10 +41,11 @@ export class ClaudeCliClient implements LlmClient {
     const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
 
     const model = (params as { model?: string }).model || this.cfg.model;
-    const { maxTokens, requestTimeoutSec } = this.cfg;
-    const args: string[] = ["-p", userText, "--output-format", "stream-json", "--verbose"];
+    const { requestTimeoutSec } = this.cfg;
+    // iclaude.sh parses -p as --proxy, so claude flags must come after --
+    const args: string[] = ["--no-proxy"];
     if (model) args.push("--model", model);
-    if (maxTokens) args.push("--max-tokens", String(maxTokens));
+    args.push("--", "-p", userText, "--output-format", "stream-json", "--verbose");
     if (systemContent) args.push("--system-prompt", systemContent);
 
     if ((params as { stream?: boolean }).stream) {
