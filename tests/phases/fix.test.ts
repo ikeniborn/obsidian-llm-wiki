@@ -48,7 +48,7 @@ describe("runFix", () => {
     expect(events.some((e: any) => e.kind === "error")).toBe(true);
   });
 
-  it("yields result with 0 fixes when no pages exist", async () => {
+  it("yields result with message when no pages exist", async () => {
     const vt = new VaultTools(mockAdapter(), "/vault");
     const events = await collect(
       runFix(["work"], vt, makeLlm("[]"), "model", [domain], "/vault", new AbortController().signal),
@@ -58,7 +58,7 @@ describe("runFix", () => {
     expect(result.text).toMatch(/No wiki pages/);
   });
 
-  it("writes fixed pages returned by LLM", async () => {
+  it("writes fixed pages and result lists page names", async () => {
     const adapter = mockAdapter({
       list: vi.fn().mockResolvedValue({ files: ["vaults/Work/!Wiki/work/Page.md"], folders: [] }),
       read: vi.fn().mockResolvedValue("# Page\n\nContent with [[DeadLink]]."),
@@ -75,6 +75,24 @@ describe("runFix", () => {
       "# Page\n\nContent without dead link.",
     );
     const result = events.find((e: any) => e.kind === "result") as any;
-    expect(result.text).toMatch(/Fixed 1/);
+    expect(result.text).toMatch(/Исправлено 1/);
+    expect(result.text).toMatch(/Page\.md/);
+    expect(result.text).toMatch(/структурного анализа/);
+  });
+
+  it("result mentions lint report when provided", async () => {
+    const adapter = mockAdapter({
+      list: vi.fn().mockResolvedValue({ files: ["vaults/Work/!Wiki/work/Page.md"], folders: [] }),
+      read: vi.fn().mockResolvedValue("# Page\n\nOk."),
+    });
+    const vt = new VaultTools(adapter, "/vault");
+    const fixed = JSON.stringify([
+      { path: "vaults/Work/!Wiki/work/Page.md", content: "# Page\n\nFixed." },
+    ]);
+    const events = await collect(
+      runFix(["work"], vt, makeLlm(fixed), "model", [domain], "/vault", new AbortController().signal, {}, "## Lint report"),
+    );
+    const result = events.find((e: any) => e.kind === "result") as any;
+    expect(result.text).toMatch(/lint-отчёта/);
   });
 });

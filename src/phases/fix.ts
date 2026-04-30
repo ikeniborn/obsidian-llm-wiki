@@ -84,23 +84,56 @@ export async function* runFix(
   if (signal.aborted) return;
 
   const fixedPages = parseJsonPages(fullText);
-  let written = 0;
+  const writtenPaths: string[] = [];
+  const errors: string[] = [];
   for (const page of fixedPages) {
     yield { kind: "tool_use", name: "Write", input: { path: page.path } };
     try {
       await vaultTools.write(page.path, page.content);
-      written++;
+      writtenPaths.push(page.path);
       yield { kind: "tool_result", ok: true };
     } catch (e) {
+      errors.push(`${page.path}: ${(e as Error).message}`);
       yield { kind: "tool_result", ok: false, preview: (e as Error).message };
     }
   }
 
-  yield {
-    kind: "result",
-    durationMs: Date.now() - start,
-    text: written > 0 ? `Fixed ${written} wiki page(s).` : "No pages required fixes.",
-  };
+  const summary = buildFixSummary(domain.id, writtenPaths, errors, structuralIssues, lintReport);
+  yield { kind: "result", durationMs: Date.now() - start, text: summary };
+}
+
+function buildFixSummary(
+  domainId: string,
+  writtenPaths: string[],
+  errors: string[],
+  structuralIssues: string,
+  lintReport?: string,
+): string {
+  const lines: string[] = [];
+
+  const source = lintReport ? "lint-отчёта" : "структурного анализа";
+  if (writtenPaths.length > 0) {
+    lines.push(`Исправлено ${writtenPaths.length} стр. домена «${domainId}» на основе ${source}:`);
+    for (const p of writtenPaths) {
+      const name = p.split("/").pop() ?? p;
+      lines.push(`  • ${name}`);
+    }
+  } else {
+    lines.push(`Домен «${domainId}»: правки не потребовались (на основе ${source}).`);
+  }
+
+  if (errors.length > 0) {
+    lines.push(`\nОшибки записи (${errors.length}):`);
+    for (const e of errors) lines.push(`  ✖ ${e}`);
+  }
+
+  if (structuralIssues) {
+    lines.push(`\nСтруктурные проблемы:\n${structuralIssues}`);
+  } else {
+    lines.push("\nСтруктурных проблем не обнаружено.");
+  }
+
+  return lines.join("\n");
 }
 
 function buildFixMessages(
