@@ -255,10 +255,14 @@ export class EditDomainModal extends Modal {
   }
 
   private handleSave(): void {
+    if (this.errorEl) this.errorEl.style.display = "none";
     let entityTypes: EntityType[];
     try {
       const parsed = JSON.parse(this.entityTypesVal.trim() || "[]");
       if (!Array.isArray(parsed)) throw new Error("not an array");
+      if (!parsed.every((x: unknown) => typeof x === "object" && x !== null && !Array.isArray(x))) {
+        throw new Error("not an array of objects");
+      }
       entityTypes = parsed as EntityType[];
     } catch {
       if (this.errorEl) {

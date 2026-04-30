@@ -83,14 +83,14 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     const domains = s.domains ?? [];
     if (domains.length === 0) {
       containerEl.createEl("p", {
-        text: "No domains. Add a domain via the sidebar panel (Add domain button).",
+        text: T.settings.domains_empty,
         cls: "setting-item-description",
       });
     } else {
       for (let i = 0; i < domains.length; i++) {
         const d = domains[i];
         new Setting(containerEl)
-          .setName(`${d.name || d.id}`)
+          .setName(d.name || d.id)
           .setDesc(d.id)
           .addButton((b) =>
             b.setButtonText(T.settings.editDomain).onClick(() => {
@@ -103,7 +103,8 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           )
           .addButton((b) =>
             b.setButtonText(T.settings.deleteDomain).setWarning().onClick(async () => {
-              new Notice(T.settings.confirmDeleteDomain(d.id));
+              if (!confirm(T.settings.confirmDeleteDomain(d.id))) return;
+              new Notice(T.settings.domainDeleted(d.id));
               s.domains.splice(i, 1);
               await this.plugin.saveSettings();
               this.display();
