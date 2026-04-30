@@ -64,7 +64,7 @@ export class AgentRunner {
         yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
         break;
       case "fix":
-        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
+        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts, req.lintReport);
         break;
       default: {
         const start = Date.now();

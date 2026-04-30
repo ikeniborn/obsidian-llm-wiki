@@ -1,5 +1,5 @@
 import { App, ItemView, Modal, WorkspaceLeaf, MarkdownRenderer, Component, Notice } from "obsidian";
-import { AddDomainModal, ConfirmModal } from "./modals";
+import { AddDomainModal, ConfirmModal, FixFromLintModal } from "./modals";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
 import { i18n } from "./i18n";
@@ -110,10 +110,12 @@ export class LlmWikiView extends ItemView {
     this.fixBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
       if (!d) { new Notice(i18n().view.selectDomainForInit); return; }
-      new ConfirmModal(this.plugin.app, "Fix — confirm", [
-        `Domain: «${d}»`,
-        "Claude will fix dead links, missing frontmatter and other issues in wiki pages.",
-      ], () => void this.plugin.controller.fix(d)).open();
+      const lintEntries = this.plugin.settings.history.filter(
+        (h) => h.operation === "lint" && (h.args.length === 0 || h.args.includes(d)) && h.finalText,
+      );
+      new FixFromLintModal(this.plugin.app, d, lintEntries,
+        (lintReport) => void this.plugin.controller.fix(d, lintReport),
+      ).open();
     });
 
     this.refreshDomains();

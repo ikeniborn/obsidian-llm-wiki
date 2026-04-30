@@ -1,5 +1,6 @@
 import { App, Modal, Setting } from "obsidian";
 import type { AddDomainInput, DomainEntry, EntityType } from "./domain-map";
+import type { RunHistoryEntry } from "./types";
 import { i18n } from "./i18n";
 
 export class ConfirmModal extends Modal {
@@ -281,6 +282,52 @@ export class EditDomainModal extends Modal {
     };
     this.close();
     this.onSave(updated);
+  }
+
+  onClose(): void { this.contentEl.empty(); }
+}
+
+export class FixFromLintModal extends Modal {
+  constructor(
+    app: App,
+    private domainId: string,
+    private lintEntries: RunHistoryEntry[],
+    private onRun: (lintReport: string | undefined) => void,
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    const T = i18n().modal;
+    contentEl.createEl("h3", { text: T.fixFromLintTitle(this.domainId) });
+
+    if (this.lintEntries.length > 0) {
+      contentEl.createEl("p", { text: T.fixFromLintDesc, cls: "muted" });
+      for (const entry of this.lintEntries) {
+        const date = new Date(entry.startedAt).toLocaleString();
+        const preview = entry.finalText.slice(0, 120).replace(/\n+/g, " ");
+        new Setting(contentEl)
+          .setName(date)
+          .setDesc(preview + (entry.finalText.length > 120 ? "…" : ""))
+          .addButton((b) => b.setButtonText(T.fixUseLint).setCta().onClick(() => {
+            this.close();
+            this.onRun(entry.finalText);
+          }));
+      }
+      contentEl.createEl("hr");
+    }
+
+    new Setting(contentEl)
+      .setName(T.fixWithoutLint)
+      .setDesc(T.fixWithoutLintDesc)
+      .addButton((b) => b.setButtonText(T.run).onClick(() => {
+        this.close();
+        this.onRun(undefined);
+      }));
+
+    new Setting(contentEl)
+      .addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close()));
   }
 
   onClose(): void { this.contentEl.empty(); }

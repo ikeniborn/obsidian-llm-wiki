@@ -18,6 +18,7 @@ export async function* runFix(
   repoRoot: string,
   signal: AbortSignal,
   opts: LlmCallOptions = {},
+  lintReport?: string,
 ): AsyncGenerator<RunEvent> {
   const domainId = args[0];
   const domain = domainId
@@ -57,7 +58,7 @@ export async function* runFix(
   yield { kind: "assistant_text", delta: `Fixing wiki pages for domain "${domain.id}"...\n` };
 
   const start = Date.now();
-  const messages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock);
+  const messages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport);
   const params = buildChatParams(model, messages, opts);
 
   let fullText = "";
@@ -108,6 +109,7 @@ function buildFixMessages(
   pages: Map<string, string>,
   structuralIssues: string,
   entityTypesBlock: string,
+  lintReport?: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   const today = new Date().toISOString().slice(0, 10);
   const pagesBlock = [...pages.entries()]
@@ -137,9 +139,10 @@ function buildFixMessages(
       content: [
         `Домен: ${domain.id} (${domain.name})`,
         structuralIssues ? `\nСтруктурные проблемы:\n${structuralIssues}` : "\nСтруктурных проблем не обнаружено.",
+        lintReport ? `\nОтчёт Lint (рекомендации к исправлению):\n${lintReport}` : "",
         ``,
         `Wiki-страницы:\n${pagesBlock}`,
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
     },
   ];
 }

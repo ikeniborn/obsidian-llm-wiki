@@ -126,6 +126,11 @@ const en = {
     sourcePathsLabel: "Source paths (one per line)",
     languageNotesLabel: "Language notes",
     save: "Save",
+    fixFromLintTitle: (id: string) => `Fix wiki — domain "${id}"`,
+    fixFromLintDesc: "Select a lint report to guide the fix:",
+    fixUseLint: "Fix with this report",
+    fixWithoutLint: "Fix without lint report",
+    fixWithoutLintDesc: "Apply only structural fixes (dead links, missing frontmatter).",
   },
 };
 
@@ -257,6 +262,11 @@ const ru: I18n = {
     sourcePathsLabel: "Пути источников (по одному на строку)",
     languageNotesLabel: "Заметки о языке",
     save: "Сохранить",
+    fixFromLintTitle: (id: string) => `Fix wiki — домен «${id}»`,
+    fixFromLintDesc: "Выберите отчёт lint для исправления:",
+    fixUseLint: "Исправить по этому отчёту",
+    fixWithoutLint: "Исправить без отчёта lint",
+    fixWithoutLintDesc: "Применить только структурные исправления (мёртвые ссылки, frontmatter).",
   },
 };
 
@@ -386,6 +396,11 @@ const es: I18n = {
     sourcePathsLabel: "Rutas de origen (una por línea)",
     languageNotesLabel: "Notas de idioma",
     save: "Guardar",
+    fixFromLintTitle: (id: string) => `Fix wiki — dominio "${id}"`,
+    fixFromLintDesc: "Selecciona un informe lint para guiar la corrección:",
+    fixUseLint: "Corregir con este informe",
+    fixWithoutLint: "Corregir sin informe lint",
+    fixWithoutLintDesc: "Aplicar solo correcciones estructurales (enlaces muertos, frontmatter).",
   },
 };
 

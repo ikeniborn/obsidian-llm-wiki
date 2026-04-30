@@ -47,8 +47,8 @@ export class WikiController {
     await this.dispatch("init", args);
   }
 
-  async fix(domain: string): Promise<void> {
-    await this.dispatch("fix", [domain]);
+  async fix(domain: string, lintReport?: string): Promise<void> {
+    await this.dispatch("fix", [domain], undefined, lintReport);
   }
 
   cwdOrEmpty(): string {
@@ -129,7 +129,7 @@ export class WikiController {
     } catch { /* не блокируем операцию */ }
   }
 
-  private async dispatch(op: WikiOperation, args: string[], domainId?: string): Promise<void> {
+  private async dispatch(op: WikiOperation, args: string[], domainId?: string, lintReport?: string): Promise<void> {
     if (this.isBusy()) {
       new Notice(i18n().ctrl.operationRunning);
       return;
@@ -163,7 +163,7 @@ export class WikiController {
       : vaultBasePath;
 
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1000;
-    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId, lintReport });
 
     try {
       for await (const ev of runGen) {

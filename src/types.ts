@@ -18,6 +18,7 @@ export interface RunRequest {
   signal: AbortSignal;
   timeoutMs: number;
   domainId?: string;
+  lintReport?: string;
 }
 
 export type RunEvent =
