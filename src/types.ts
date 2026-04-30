@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import type { DomainEntry } from "./domain-map";
 
 export type WikiOperation =
   | "ingest"
@@ -26,7 +27,8 @@ export type RunEvent =
   | { kind: "result"; durationMs: number; usdCost?: number; text: string }
   | { kind: "error"; message: string }
   | { kind: "exit"; code: number }
-  | { kind: "ask_user"; question: string; options: string[]; toolUseId: string };
+  | { kind: "ask_user"; question: string; options: string[]; toolUseId: string }
+  | { kind: "domain_created"; entry: DomainEntry };
 
 export interface RunHistoryEntry {
   id: string;
@@ -80,7 +82,7 @@ export interface NativeOperationConfig {
 export interface LlmWikiPluginSettings {
   backend: "claude-agent" | "native-agent";
   systemPrompt: string;
-  domainMapDir: string;
+  domains: DomainEntry[];
   maxTokens: number;
   agentLogPath: string;
   historyLimit: number;
@@ -112,7 +114,7 @@ export interface LlmWikiPluginSettings {
 export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   backend: "claude-agent",
   systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
-  domainMapDir: "",
+  domains: [],
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
