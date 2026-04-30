@@ -33,7 +33,7 @@ var DEFAULT_SETTINGS = {
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600 },
+  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600, fix: 300 },
   history: [],
   claudeAgent: {
     iclaudePath: "",
@@ -43,7 +43,8 @@ var DEFAULT_SETTINGS = {
       ingest: { model: "haiku", maxTokens: 4096 },
       query: { model: "sonnet", maxTokens: 4096 },
       lint: { model: "haiku", maxTokens: 4096 },
-      init: { model: "sonnet", maxTokens: 8192 }
+      init: { model: "sonnet", maxTokens: 8192 },
+      fix: { model: "sonnet", maxTokens: 8192 }
     }
   },
   nativeAgent: {
@@ -58,7 +59,8 @@ var DEFAULT_SETTINGS = {
       ingest: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
       query: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
       lint: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
-      init: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 }
+      init: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
+      fix: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 }
     }
   }
 };
@@ -108,14 +110,15 @@ var en = {
     temperature_desc: "0.0\u20131.0.",
     topP_name: "Top-p",
     topP_desc: "0.0\u20131.0, or empty \u2014 disable.",
-    numCtx_name: "num_ctx (Ollama)",
-    numCtx_desc: "Context size. Empty \u2014 model default.",
+    numCtx_name: "Context window",
+    numCtx_desc: "Context size (num_ctx). Empty \u2014 model default.",
     perOperation_name: "Per-operation models",
     perOperation_desc: "Configure separate model and parameters for each operation.",
     op_ingest: "Ingest",
     op_query: "Query",
     op_lint: "Lint",
     op_init: "Init",
+    op_fix: "Fix",
     opModel_name: "Model",
     opModel_desc: "Model name for this operation.",
     opMaxTokens_name: "Max tokens",
@@ -128,6 +131,7 @@ var en = {
     addDomain: "Add domain",
     ingest: "Ingest",
     lint: "Lint",
+    fix: "Fix",
     init: "Init",
     ask: "Ask",
     askAndSave: "Ask and save",
@@ -161,6 +165,7 @@ var en = {
     query: "Query",
     querySave: "Query and save as page",
     lint: "Lint domain",
+    fix: "Fix domain wiki",
     init: "Init domain",
     cancel: "Cancel operation"
   },
@@ -193,7 +198,12 @@ var en = {
     entityTypesError: "Invalid JSON array \u2014 must be an array of objects",
     sourcePathsLabel: "Source paths (one per line)",
     languageNotesLabel: "Language notes",
-    save: "Save"
+    save: "Save",
+    fixFromLintTitle: (id) => `Fix wiki \u2014 domain "${id}"`,
+    fixFromLintDesc: "Select a lint report to guide the fix:",
+    fixUseLint: "Fix with this report",
+    fixWithoutLint: "Fix without lint report",
+    fixWithoutLintDesc: "Apply only structural fixes (dead links, missing frontmatter)."
   }
 };
 var ru = {
@@ -233,14 +243,15 @@ var ru = {
     temperature_desc: "0.0\u20131.0.",
     topP_name: "Top-p",
     topP_desc: "0.0\u20131.0, \u0438\u043B\u0438 \u043F\u0443\u0441\u0442\u043E \u2014 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C.",
-    numCtx_name: "num_ctx (Ollama)",
-    numCtx_desc: "\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0430. \u041F\u0443\u0441\u0442\u043E \u2014 \u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438.",
+    numCtx_name: "\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u043E\u0435 \u043E\u043A\u043D\u043E",
+    numCtx_desc: "\u0420\u0430\u0437\u043C\u0435\u0440 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0430 (num_ctx). \u041F\u0443\u0441\u0442\u043E \u2014 \u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438.",
     perOperation_name: "\u041C\u043E\u0434\u0435\u043B\u0438 \u043F\u043E \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u044F\u043C",
     perOperation_desc: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u0443\u044E \u043C\u043E\u0434\u0435\u043B\u044C \u0438 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u0434\u043B\u044F \u043A\u0430\u0436\u0434\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.",
     op_ingest: "Ingest",
     op_query: "Query",
     op_lint: "Lint",
     op_init: "Init",
+    op_fix: "Fix",
     opModel_name: "\u041C\u043E\u0434\u0435\u043B\u044C",
     opModel_desc: "\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438 \u0434\u043B\u044F \u044D\u0442\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.",
     opMaxTokens_name: "Max tokens",
@@ -253,6 +264,7 @@ var ru = {
     addDomain: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D",
     ingest: "Ingest",
     lint: "Lint",
+    fix: "Fix",
     init: "Init",
     ask: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C",
     askAndSave: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
@@ -286,6 +298,7 @@ var ru = {
     query: "\u0417\u0430\u043F\u0440\u043E\u0441",
     querySave: "\u0417\u0430\u043F\u0440\u043E\u0441 \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u0430\u043A \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443",
     lint: "Lint \u0434\u043E\u043C\u0435\u043D\u0430",
+    fix: "Fix wiki \u0434\u043E\u043C\u0435\u043D\u0430",
     init: "Init \u0434\u043E\u043C\u0435\u043D\u0430",
     cancel: "\u041E\u0442\u043C\u0435\u043D\u0430 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438"
   },
@@ -318,7 +331,12 @@ var ru = {
     entityTypesError: "\u041D\u0435\u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u2014 \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043C\u0430\u0441\u0441\u0438\u0432\u043E\u043C \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432",
     sourcePathsLabel: "\u041F\u0443\u0442\u0438 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u043E\u0432 (\u043F\u043E \u043E\u0434\u043D\u043E\u043C\u0443 \u043D\u0430 \u0441\u0442\u0440\u043E\u043A\u0443)",
     languageNotesLabel: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438 \u043E \u044F\u0437\u044B\u043A\u0435",
-    save: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C"
+    save: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
+    fixFromLintTitle: (id) => `Fix wiki \u2014 \u0434\u043E\u043C\u0435\u043D \xAB${id}\xBB`,
+    fixFromLintDesc: "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0442\u0447\u0451\u0442 lint \u0434\u043B\u044F \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F:",
+    fixUseLint: "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u043E \u044D\u0442\u043E\u043C\u0443 \u043E\u0442\u0447\u0451\u0442\u0443",
+    fixWithoutLint: "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437 \u043E\u0442\u0447\u0451\u0442\u0430 lint",
+    fixWithoutLintDesc: "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u043E\u043B\u044C\u043A\u043E \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F (\u043C\u0451\u0440\u0442\u0432\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438, frontmatter)."
   }
 };
 var es = {
@@ -358,14 +376,15 @@ var es = {
     temperature_desc: "0.0\u20131.0.",
     topP_name: "Top-p",
     topP_desc: "0.0\u20131.0, o vac\xEDo \u2014 desactivar.",
-    numCtx_name: "num_ctx (Ollama)",
-    numCtx_desc: "Tama\xF1o del contexto. Vac\xEDo \u2014 valor por defecto del modelo.",
+    numCtx_name: "Ventana de contexto",
+    numCtx_desc: "Tama\xF1o del contexto (num_ctx). Vac\xEDo \u2014 valor por defecto del modelo.",
     perOperation_name: "Modelos por operaci\xF3n",
     perOperation_desc: "Configurar modelo y par\xE1metros separados para cada operaci\xF3n.",
     op_ingest: "Ingest",
     op_query: "Query",
     op_lint: "Lint",
     op_init: "Init",
+    op_fix: "Fix",
     opModel_name: "Modelo",
     opModel_desc: "Nombre del modelo para esta operaci\xF3n.",
     opMaxTokens_name: "M\xE1x. tokens",
@@ -378,6 +397,7 @@ var es = {
     addDomain: "A\xF1adir dominio",
     ingest: "Ingest",
     lint: "Lint",
+    fix: "Fix",
     init: "Init",
     ask: "Preguntar",
     askAndSave: "Preguntar y guardar",
@@ -411,6 +431,7 @@ var es = {
     query: "Consulta",
     querySave: "Consulta y guardar como p\xE1gina",
     lint: "Lint del dominio",
+    fix: "Fix wiki del dominio",
     init: "Init del dominio",
     cancel: "Cancelar operaci\xF3n"
   },
@@ -443,7 +464,12 @@ var es = {
     entityTypesError: "Array JSON inv\xE1lido \u2014 debe ser un array de objetos",
     sourcePathsLabel: "Rutas de origen (una por l\xEDnea)",
     languageNotesLabel: "Notas de idioma",
-    save: "Guardar"
+    save: "Guardar",
+    fixFromLintTitle: (id) => `Fix wiki \u2014 dominio "${id}"`,
+    fixFromLintDesc: "Selecciona un informe lint para guiar la correcci\xF3n:",
+    fixUseLint: "Corregir con este informe",
+    fixWithoutLint: "Corregir sin informe lint",
+    fixWithoutLintDesc: "Aplicar solo correcciones estructurales (enlaces muertos, frontmatter)."
   }
 };
 var locales = { ru, es };
@@ -704,6 +730,39 @@ var EditDomainModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
+var FixFromLintModal = class extends import_obsidian2.Modal {
+  constructor(app, domainId, lintEntries, onRun) {
+    super(app);
+    this.domainId = domainId;
+    this.lintEntries = lintEntries;
+    this.onRun = onRun;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    const T = i18n().modal;
+    contentEl.createEl("h3", { text: T.fixFromLintTitle(this.domainId) });
+    if (this.lintEntries.length > 0) {
+      contentEl.createEl("p", { text: T.fixFromLintDesc, cls: "muted" });
+      for (const entry of this.lintEntries) {
+        const date = new Date(entry.startedAt).toLocaleString();
+        const preview = entry.finalText.slice(0, 120).replace(/\n+/g, " ");
+        new import_obsidian2.Setting(contentEl).setName(date).setDesc(preview + (entry.finalText.length > 120 ? "\u2026" : "")).addButton((b) => b.setButtonText(T.fixUseLint).setCta().onClick(() => {
+          this.close();
+          this.onRun(entry.finalText);
+        }));
+      }
+      contentEl.createEl("hr");
+    }
+    new import_obsidian2.Setting(contentEl).setName(T.fixWithoutLint).setDesc(T.fixWithoutLintDesc).addButton((b) => b.setButtonText(T.run).onClick(() => {
+      this.close();
+      this.onRun(void 0);
+    }));
+    new import_obsidian2.Setting(contentEl).addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close()));
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
 
 // src/settings.ts
 var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
@@ -867,6 +926,19 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
             await this.plugin.saveSettings();
           })
         );
+        new import_obsidian3.Setting(containerEl).setName(T.settings.numCtx_name).setDesc(T.settings.numCtx_desc).addText(
+          (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
+            const trimmed = v.trim();
+            if (!trimmed) {
+              s.nativeAgent.numCtx = null;
+            } else {
+              const n = Number(trimmed);
+              if (Number.isFinite(n) && n > 0)
+                s.nativeAgent.numCtx = Math.floor(n);
+            }
+            await this.plugin.saveSettings();
+          })
+        );
         new import_obsidian3.Setting(containerEl).setName(T.settings.temperature_name).setDesc(T.settings.temperature_desc).addText(
           (t) => t.setPlaceholder("0.2").setValue(String(s.nativeAgent.temperature)).onChange(async (v) => {
             const n = Number(v);
@@ -919,32 +991,6 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
           );
         }
       }
-      new import_obsidian3.Setting(containerEl).setName(T.settings.topP_name).setDesc(T.settings.topP_desc).addText(
-        (t) => t.setPlaceholder("(\u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E)").setValue(s.nativeAgent.topP != null ? String(s.nativeAgent.topP) : "").onChange(async (v) => {
-          const trimmed = v.trim();
-          if (!trimmed) {
-            s.nativeAgent.topP = null;
-          } else {
-            const n = Number(trimmed);
-            if (Number.isFinite(n) && n >= 0 && n <= 1)
-              s.nativeAgent.topP = n;
-          }
-          await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian3.Setting(containerEl).setName(T.settings.numCtx_name).setDesc(T.settings.numCtx_desc).addText(
-        (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
-          const trimmed = v.trim();
-          if (!trimmed) {
-            s.nativeAgent.numCtx = null;
-          } else {
-            const n = Number(trimmed);
-            if (Number.isFinite(n) && n > 0)
-              s.nativeAgent.numCtx = Math.floor(n);
-          }
-          await this.plugin.saveSettings();
-        })
-      );
     }
   }
 };
@@ -978,9 +1024,10 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
   askBtn;
   askSaveBtn;
   domainSelect;
-  lintBtn;
   initBtn;
   ingestBtn;
+  lintBtn;
+  fixBtn;
   startTs = 0;
   toolCount = 0;
   stepCount = 0;
@@ -1017,9 +1064,22 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     const addBtn = domainRow.createEl("button", { text: T.view.addDomain });
     addBtn.addEventListener("click", () => this.openAddDomain());
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
+    this.initBtn = actionRow.createEl("button", { text: T.view.init });
     this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
     this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
-    this.initBtn = actionRow.createEl("button", { text: T.view.init });
+    this.fixBtn = actionRow.createEl("button", { text: T.view.fix });
+    this.domainSelect.addEventListener("change", () => this.updateInitBtn());
+    this.initBtn.addEventListener("click", () => {
+      const d = this.domainSelect.value;
+      if (!d) {
+        new import_obsidian4.Notice(i18n().view.selectDomainForInit);
+        return;
+      }
+      new ConfirmModal(this.plugin.app, "Init \u2014 confirm", [
+        `Domain: \xAB${d}\xBB`,
+        "Claude will generate entity_types and language_notes for the domain."
+      ], () => void this.plugin.controller.init(d, false)).open();
+    });
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
       if (!file) {
@@ -1037,19 +1097,24 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       const domainLabel = d ? `\xAB${d}\xBB` : "all wiki";
       new ConfirmModal(this.plugin.app, "Lint \u2014 confirm", [
         `Domain: ${domainLabel}`,
-        "Claude will check wiki pages for quality standards."
+        "Claude will check wiki pages for quality and update entity_types."
       ], () => void this.plugin.controller.lint(d || "all")).open();
     });
-    this.initBtn.addEventListener("click", () => {
+    this.fixBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
       if (!d) {
         new import_obsidian4.Notice(i18n().view.selectDomainForInit);
         return;
       }
-      new ConfirmModal(this.plugin.app, "Init \u2014 confirm", [
-        `Domain: \xAB${d}\xBB`,
-        "Claude will create the folder structure and base wiki pages for the domain."
-      ], () => void this.plugin.controller.init(d, false)).open();
+      const lintEntries = this.plugin.settings.history.filter(
+        (h) => h.operation === "lint" && (h.args.length === 0 || h.args.includes(d)) && h.finalText
+      );
+      new FixFromLintModal(
+        this.plugin.app,
+        d,
+        lintEntries,
+        (lintReport) => void this.plugin.controller.fix(d, lintReport)
+      ).open();
     });
     this.refreshDomains();
     const ask = root.createDiv("llm-wiki-ask");
@@ -1104,6 +1169,20 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     if (previous && Array.from(this.domainSelect.options).some((o) => o.value === previous)) {
       this.domainSelect.value = previous;
     }
+    this.updateInitBtn();
+  }
+  updateInitBtn() {
+    if (this.state === "running")
+      return;
+    const domainId = this.domainSelect.value;
+    if (!domainId) {
+      this.initBtn.disabled = true;
+      return;
+    }
+    const domain = this.plugin.controller.loadDomains().find((d) => d.id === domainId);
+    const isNew = !domain?.entity_types?.length;
+    this.initBtn.disabled = !isNew;
+    this.initBtn.title = isNew ? "" : "Already initialised \u2014 use Lint to update entity_types";
   }
   openAddDomain() {
     const cwd = this.plugin.controller.cwdOrEmpty();
@@ -1145,9 +1224,10 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.cancelBtn.disabled = false;
     this.askBtn.disabled = true;
     this.askSaveBtn.disabled = true;
+    this.initBtn.disabled = true;
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
-    this.initBtn.disabled = true;
+    this.fixBtn.disabled = true;
     this.resultSection.addClass("llm-wiki-hidden");
     this.finalEl.empty();
     this.resultOpen = false;
@@ -1169,6 +1249,12 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
   }
   appendEvent(ev) {
     if (ev.kind === "domain_created") {
+      this.refreshDomains();
+      return;
+    }
+    if (ev.kind === "source_path_added")
+      return;
+    if (ev.kind === "domain_updated") {
       this.refreshDomains();
       return;
     }
@@ -1257,7 +1343,8 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.askSaveBtn.disabled = false;
     this.ingestBtn.disabled = false;
     this.lintBtn.disabled = false;
-    this.initBtn.disabled = false;
+    this.fixBtn.disabled = false;
+    this.updateInitBtn();
     if (this.tickHandle !== null) {
       window.clearInterval(this.tickHandle);
       this.tickHandle = null;
@@ -1468,7 +1555,7 @@ function translateSystemEvent(message) {
 // src/controller.ts
 var import_obsidian5 = require("obsidian");
 var import_node_fs = require("node:fs");
-var import_node_path4 = require("node:path");
+var import_node_path5 = require("node:path");
 
 // src/domain-map.ts
 function validateDomainId(id) {
@@ -1612,6 +1699,14 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
   if (written.length > 0) {
     await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
     await updateIndex(vaultTools, wikiRoot, written);
+    const topPath = extractTopLevelSourcePath(absSource, repoRoot);
+    if (topPath) {
+      const norm = (p) => p.replace(/\/$/, "");
+      const alreadyCovered = (domain.source_paths ?? []).some((sp) => norm(sp) === norm(topPath));
+      if (!alreadyCovered) {
+        yield { kind: "source_path_added", domainId: domain.id, path: topPath };
+      }
+    }
   }
   yield {
     kind: "result",
@@ -1681,6 +1776,13 @@ async function tryRead(vaultTools, path2) {
   } catch {
     return "";
   }
+}
+function extractTopLevelSourcePath(absSource, repoRoot) {
+  const rel = (0, import_node_path.relative)(repoRoot, absSource);
+  const parts = rel.split("/");
+  if (parts.length < 4)
+    return null;
+  return `${parts[0]}/${parts[1]}/${parts[2]}/`;
 }
 function buildEntityTypesBlock(domain) {
   if (!domain.entity_types?.length)
@@ -1967,6 +2069,17 @@ ${structuralIssues ? `**\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u
 ${structuralIssues}
 
 ` : ""}${llmReport}`);
+    if (signal.aborted)
+      return;
+    yield { kind: "assistant_text", delta: `
+Actualizing domain config for "${domain.id}"...
+` };
+    const patch = await actualizeDomainConfig(domain, pages, llm, model, opts, signal);
+    if (patch) {
+      const diffReport = computeEntityDiff(domain.entity_types ?? [], patch.entity_types ?? domain.entity_types ?? []);
+      reportParts.push(diffReport);
+      yield { kind: "domain_updated", domainId: domain.id, patch };
+    }
   }
   yield { kind: "result", durationMs: Date.now() - start, text: reportParts.join("\n\n---\n\n") };
 }
@@ -1989,6 +2102,89 @@ function buildEntityTypesBlock3(domain) {
   if (!domain.entity_types?.length)
     return "";
   return domain.entity_types.map((et) => `- ${et.type}: ${et.description}`).join("\n");
+}
+function computeEntityDiff(oldTypes, newTypes) {
+  const oldMap = new Map(oldTypes.map((et) => [et.type, et]));
+  const newMap = new Map(newTypes.map((et) => [et.type, et]));
+  const added = newTypes.filter((et) => !oldMap.has(et.type));
+  const removed = oldTypes.filter((et) => !newMap.has(et.type));
+  const modified = newTypes.filter((et) => {
+    const old = oldMap.get(et.type);
+    return old && JSON.stringify(old) !== JSON.stringify(et);
+  });
+  if (!added.length && !removed.length && !modified.length)
+    return "### \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F entity_types\n\u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0439 \u043D\u0435\u0442.";
+  const lines = ["### \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F entity_types"];
+  added.forEach((et) => lines.push(`- \u271A \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D: **${et.type}**`));
+  removed.forEach((et) => lines.push(`- \u2716 \u0443\u0434\u0430\u043B\u0451\u043D: **${et.type}**`));
+  modified.forEach((et) => lines.push(`- \u270E \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D: **${et.type}**`));
+  return lines.join("\n");
+}
+async function actualizeDomainConfig(domain, pages, llm, model, opts, signal) {
+  const currentConfig = JSON.stringify({
+    entity_types: domain.entity_types ?? [],
+    language_notes: domain.language_notes ?? ""
+  }, null, 2);
+  const pagesSnippet = [...pages.entries()].map(([p, c]) => `${p}:
+${c.slice(0, 300)}`).join("\n\n");
+  const messages = [
+    {
+      role: "system",
+      content: [
+        `\u0422\u044B \u2014 \u0430\u0440\u0445\u0438\u0442\u0435\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439. \u041F\u0440\u043E\u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u0443\u0439 \u0442\u0435\u043A\u0443\u0449\u0438\u0439 \u043A\u043E\u043D\u0444\u0438\u0433 \u0434\u043E\u043C\u0435\u043D\u0430 \u0438 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0435 \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 wiki.`,
+        `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E \u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON \u0441 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D\u043D\u044B\u043C\u0438 \u043F\u043E\u043B\u044F\u043C\u0438:`,
+        `{`,
+        `  "entity_types": [{"type":"...","description":"...","extraction_cues":["..."],"min_mentions_for_page":1,"wiki_subfolder":"..."}],`,
+        `  "language_notes": "..."`,
+        `}`,
+        `\u041F\u0440\u0430\u0432\u0438\u043B\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F:`,
+        `- \u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0439 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0435 \u0442\u0438\u043F\u044B \u0435\u0441\u043B\u0438 \u043E\u043D\u0438 \u043F\u043E\u043B\u0435\u0437\u043D\u044B, \u0443\u0442\u043E\u0447\u043D\u044F\u0439 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044F \u043F\u043E \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u043C\u0443 \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0443`,
+        `- \u0414\u043E\u0431\u0430\u0432\u043B\u044F\u0439 \u043D\u043E\u0432\u044B\u0435 \u0442\u0438\u043F\u044B \u0435\u0441\u043B\u0438 \u0432 wiki \u0435\u0441\u0442\u044C \u043F\u0430\u0442\u0442\u0435\u0440\u043D\u044B, \u043D\u0435 \u043F\u043E\u043A\u0440\u044B\u0442\u044B\u0435 \u0442\u0435\u043A\u0443\u0449\u0438\u043C \u043A\u043E\u043D\u0444\u0438\u0433\u043E\u043C`,
+        `- \u0423\u0431\u0438\u0440\u0430\u0439 \u0442\u0438\u043F\u044B \u0441 \u043D\u0443\u043B\u0435\u0432\u044B\u043C \u043F\u043E\u043A\u0440\u044B\u0442\u0438\u0435\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0435\u0441\u043B\u0438 \u0443\u0432\u0435\u0440\u0435\u043D \u0447\u0442\u043E \u043E\u043D\u0438 \u043D\u0435\u0440\u0435\u043B\u0435\u0432\u0430\u043D\u0442\u043D\u044B`,
+        `- \u041E\u0431\u043D\u043E\u0432\u043B\u044F\u0439 extraction_cues \u043F\u043E \u0440\u0435\u0430\u043B\u044C\u043D\u044B\u043C \u0441\u043B\u043E\u0432\u0430\u043C \u0438\u0437 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446`,
+        `- language_notes \u2014 \u043F\u0440\u0430\u0432\u0438\u043B\u0430 \u043D\u0430\u043F\u0438\u0441\u0430\u043D\u0438\u044F \u0442\u0435\u0440\u043C\u0438\u043D\u043E\u0432, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0430\u0433\u0435\u043D\u0442 \u0434\u043E\u043B\u0436\u0435\u043D \u0441\u043E\u0431\u043B\u044E\u0434\u0430\u0442\u044C`
+      ].join("\n")
+    },
+    {
+      role: "user",
+      content: [
+        `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
+        ``,
+        `\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u043A\u043E\u043D\u0444\u0438\u0433:`,
+        `\`\`\`json`,
+        currentConfig,
+        `\`\`\``,
+        ``,
+        `Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B (\u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u044B):`,
+        pagesSnippet || "(\u043D\u0435\u0442 \u0441\u0442\u0440\u0430\u043D\u0438\u0446)"
+      ].join("\n")
+    }
+  ];
+  const params = buildChatParams(model, messages, opts);
+  let fullText = "";
+  try {
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false },
+      { signal }
+    );
+    fullText = resp.choices[0]?.message?.content ?? "";
+  } catch {
+    return null;
+  }
+  try {
+    const match = fullText.match(/\{[\s\S]*\}/);
+    if (!match)
+      return null;
+    const parsed = JSON.parse(match[0]);
+    const patch = {};
+    if (Array.isArray(parsed.entity_types))
+      patch.entity_types = parsed.entity_types;
+    if (typeof parsed.language_notes === "string")
+      patch.language_notes = parsed.language_notes;
+    return Object.keys(patch).length > 0 ? patch : null;
+  } catch {
+    return null;
+  }
 }
 
 // src/phases/init.ts
@@ -2022,7 +2218,7 @@ async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultNa
     `  "id": "${domainId}",`,
     `  "name": "\u0427\u0435\u043B\u043E\u0432\u0435\u043A\u043E\u0447\u0438\u0442\u0430\u0435\u043C\u043E\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435",`,
     `  "wiki_folder": "vaults/${vaultName}/!Wiki/${domainId}",`,
-    `  "source_paths": ["relative/source/path"],`,
+    `  "source_paths": [],`,
     `  "entity_types": [{"type":"...","description":"...","extraction_cues":["..."],"min_mentions_for_page":1,"wiki_subfolder":"${domainId}/..."}],`,
     `  "language_notes": ""`,
     `}`,
@@ -2129,6 +2325,152 @@ async function tryRead3(vaultTools, path2) {
   }
 }
 
+// src/phases/fix.ts
+var import_node_path4 = require("node:path");
+var META_FILES3 = ["_index.md", "_log.md", "_schema.md"];
+async function* runFix(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}, lintReport) {
+  const domainId = args[0];
+  const domain = domainId ? domains.find((d) => d.id === domainId) : domains[0];
+  if (!domain) {
+    yield { kind: "error", message: domainId ? `Domain "${domainId}" not found.` : "No domains configured." };
+    return;
+  }
+  const absWiki = (0, import_node_path4.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path4.join)(repoRoot, domain.wiki_folder);
+  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
+  if (!wikiVaultPath) {
+    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
+    return;
+  }
+  yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
+  const allFiles = await vaultTools.listFiles(wikiVaultPath);
+  const files = allFiles.filter((f) => !META_FILES3.some((m) => f.endsWith(m)));
+  yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
+  if (files.length === 0) {
+    const start2 = Date.now();
+    yield { kind: "result", durationMs: Date.now() - start2, text: "No wiki pages to fix." };
+    return;
+  }
+  const pages = await vaultTools.readAll(files);
+  const structuralIssues = checkStructure(pages);
+  const entityTypesBlock = domain.entity_types?.length ? domain.entity_types.map((et) => `- ${et.type}: ${et.description}`).join("\n") : "";
+  yield { kind: "assistant_text", delta: `Fixing wiki pages for domain "${domain.id}"...
+` };
+  const start = Date.now();
+  const messages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport);
+  const params = buildChatParams(model, messages, opts);
+  let fullText = "";
+  try {
+    const stream = await llm.chat.completions.create(
+      { ...params, stream: true },
+      { signal }
+    );
+    for await (const chunk of stream) {
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning)
+        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) {
+        fullText += content;
+        yield { kind: "assistant_text", delta: content };
+      }
+    }
+  } catch (e) {
+    if (signal.aborted || e.name === "AbortError")
+      return;
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false }
+    );
+    fullText = resp.choices[0]?.message?.content ?? "";
+    if (fullText)
+      yield { kind: "assistant_text", delta: fullText };
+  }
+  if (signal.aborted)
+    return;
+  const fixedPages = parseJsonPages(fullText);
+  const writtenPaths = [];
+  const errors = [];
+  for (const page of fixedPages) {
+    yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+    try {
+      await vaultTools.write(page.path, page.content);
+      writtenPaths.push(page.path);
+      yield { kind: "tool_result", ok: true };
+    } catch (e) {
+      errors.push(`${page.path}: ${e.message}`);
+      yield { kind: "tool_result", ok: false, preview: e.message };
+    }
+  }
+  const summary = buildFixSummary(domain.id, writtenPaths, errors, structuralIssues, lintReport);
+  yield { kind: "result", durationMs: Date.now() - start, text: summary };
+}
+function buildFixSummary(domainId, writtenPaths, errors, structuralIssues, lintReport) {
+  const lines = [];
+  const source = lintReport ? "lint-\u043E\u0442\u0447\u0451\u0442\u0430" : "\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u043E\u0433\u043E \u0430\u043D\u0430\u043B\u0438\u0437\u0430";
+  if (writtenPaths.length > 0) {
+    lines.push(`\u0418\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${writtenPaths.length} \u0441\u0442\u0440. \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domainId}\xBB \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${source}:`);
+    for (const p of writtenPaths) {
+      const name = p.split("/").pop() ?? p;
+      lines.push(`  \u2022 ${name}`);
+    }
+  } else {
+    lines.push(`\u0414\u043E\u043C\u0435\u043D \xAB${domainId}\xBB: \u043F\u0440\u0430\u0432\u043A\u0438 \u043D\u0435 \u043F\u043E\u0442\u0440\u0435\u0431\u043E\u0432\u0430\u043B\u0438\u0441\u044C (\u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${source}).`);
+  }
+  if (errors.length > 0) {
+    lines.push(`
+\u041E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 (${errors.length}):`);
+    for (const e of errors)
+      lines.push(`  \u2716 ${e}`);
+  }
+  if (structuralIssues) {
+    lines.push(`
+\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
+${structuralIssues}`);
+  } else {
+    lines.push("\n\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043E\u0431\u043D\u0430\u0440\u0443\u0436\u0435\u043D\u043E.");
+  }
+  return lines.join("\n");
+}
+function buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const pagesBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---
+${c}`).join("\n\n");
+  return [
+    {
+      role: "system",
+      content: [
+        `\u0422\u044B \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
+        `\u0418\u0441\u043F\u0440\u0430\u0432\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B \u0432 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430\u0445 \u0438 \u0432\u0435\u0440\u043D\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.`,
+        ``,
+        `\u041F\u0420\u0410\u0412\u0418\u041B\u0410 \u0418\u0421\u041F\u0420\u0410\u0412\u041B\u0415\u041D\u0418\u042F:`,
+        `- \u041C\u0451\u0440\u0442\u0432\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 [[X]]: \u0443\u0431\u0435\u0440\u0438 [[]] \u043E\u0441\u0442\u0430\u0432\u0438\u0432 \u0442\u0435\u043A\u0441\u0442 \u0438\u043B\u0438 \u0437\u0430\u043C\u0435\u043D\u0438 \u043D\u0430 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443`,
+        `- \u041E\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439 frontmatter: \u0434\u043E\u0431\u0430\u0432\u044C \u043C\u0438\u043D\u0438\u043C\u0430\u043B\u044C\u043D\u044B\u0439 (wiki_updated: ${today}, wiki_status: stub)`,
+        `- \u0414\u0443\u0431\u043B\u0438\u0440\u0443\u044E\u0449\u0438\u0439\u0441\u044F \u043A\u043E\u043D\u0442\u0435\u043D\u0442: \u043E\u0431\u044A\u0435\u0434\u0438\u043D\u0438, \u043D\u0435 \u0442\u0435\u0440\u044F\u0439 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044E`,
+        `- \u0420\u0430\u0437\u043C\u044B\u0442\u044B\u0435 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F: \u0443\u0442\u043E\u0447\u043D\u0438 \u043F\u043E \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0443 \u0434\u043E\u043C\u0435\u043D\u0430`,
+        entityTypesBlock ? `
+\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419:
+${entityTypesBlock}` : "",
+        ``,
+        `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D\u0438\u0446 (\u0435\u0441\u043B\u0438 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043D\u0435 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0430\u0441\u044C \u2014 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0430\u0439):`,
+        `[{"path":"${wikiVaultPath}/EntityName.md","content":"\u043F\u043E\u043B\u043D\u044B\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B"}]`
+      ].filter(Boolean).join("\n")
+    },
+    {
+      role: "user",
+      content: [
+        `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
+        structuralIssues ? `
+\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
+${structuralIssues}` : "\n\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043E\u0431\u043D\u0430\u0440\u0443\u0436\u0435\u043D\u043E.",
+        lintReport ? `
+\u041E\u0442\u0447\u0451\u0442 Lint (\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u0438 \u043A \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044E):
+${lintReport}` : "",
+        ``,
+        `Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
+${pagesBlock}`
+      ].filter(Boolean).join("\n")
+    }
+  ];
+}
+
 // src/agent-runner.ts
 var AgentRunner = class {
   constructor(llm, settings, vaultTools, vaultName, domains) {
@@ -2177,6 +2519,9 @@ var AgentRunner = class {
         break;
       case "init":
         yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
+        break;
+      case "fix":
+        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts, req.lintReport);
         break;
       default: {
         const start = Date.now();
@@ -9662,6 +10007,9 @@ var WikiController = class {
     const args = dryRun ? [domain, "--dry-run"] : [domain];
     await this.dispatch("init", args);
   }
+  async fix(domain, lintReport) {
+    await this.dispatch("fix", [domain], void 0, lintReport);
+  }
   cwdOrEmpty() {
     return this.app.vault.adapter.getBasePath?.() ?? "";
   }
@@ -9729,14 +10077,14 @@ var WikiController = class {
     try {
       const stat = (0, import_node_fs.existsSync)(logPath) ? (0, import_node_fs.statSync)(logPath) : null;
       if (stat?.isDirectory() || !logPath.includes(".") && !logPath.endsWith("/")) {
-        logPath = (0, import_node_path4.join)(logPath, "agent.jsonl");
+        logPath = (0, import_node_path5.join)(logPath, "agent.jsonl");
       }
       const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), session: sessionId, op, domainId, event: ev }) + "\n";
       (0, import_node_fs.appendFileSync)(logPath, line, "utf-8");
     } catch {
     }
   }
-  async dispatch(op, args, domainId) {
+  async dispatch(op, args, domainId, lintReport) {
     if (this.isBusy()) {
       new import_obsidian5.Notice(i18n().ctrl.operationRunning);
       return;
@@ -9762,7 +10110,7 @@ var WikiController = class {
     const vaultSuffix = `/vaults/${vaultName}`;
     const repoRoot = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1e3;
-    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId, lintReport });
     try {
       for await (const ev of runGen) {
         this.logEvent(sessionId, op, domainId, ev);
@@ -9772,6 +10120,27 @@ var WikiController = class {
             this.plugin.settings.domains = [];
           this.plugin.settings.domains.push(ev.entry);
           void this.plugin.saveSettings();
+        }
+        if (ev.kind === "domain_updated") {
+          const domain = this.plugin.settings.domains.find((d) => d.id === ev.domainId);
+          if (domain) {
+            if (ev.patch.entity_types !== void 0)
+              domain.entity_types = ev.patch.entity_types;
+            if (ev.patch.language_notes !== void 0)
+              domain.language_notes = ev.patch.language_notes;
+            void this.plugin.saveSettings();
+          }
+        }
+        if (ev.kind === "source_path_added") {
+          const domain = this.plugin.settings.domains.find((d) => d.id === ev.domainId);
+          if (domain) {
+            if (!domain.source_paths)
+              domain.source_paths = [];
+            if (!domain.source_paths.includes(ev.path)) {
+              domain.source_paths.push(ev.path);
+              void this.plugin.saveSettings();
+            }
+          }
         }
         this.collectStep(ev, steps);
         if (ev.kind === "result")
@@ -9842,9 +10211,9 @@ var WikiController = class {
     return view instanceof LlmWikiView ? view : null;
   }
   toVaultPath(vaultDir, savedPath) {
-    const abs = (0, import_node_path4.isAbsolute)(savedPath) ? savedPath : (0, import_node_path4.join)(vaultDir, savedPath);
-    const rel = (0, import_node_path4.relative)(vaultDir, abs);
-    if (rel.startsWith("..") || (0, import_node_path4.isAbsolute)(rel))
+    const abs = (0, import_node_path5.isAbsolute)(savedPath) ? savedPath : (0, import_node_path5.join)(vaultDir, savedPath);
+    const rel = (0, import_node_path5.relative)(vaultDir, abs);
+    if (rel.startsWith("..") || (0, import_node_path5.isAbsolute)(rel))
       return null;
     return rel;
   }
@@ -9905,6 +10274,21 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
           null,
           domains,
           (d) => void this.controller.lint(d)
+        ).open();
+      }
+    });
+    this.addCommand({
+      id: "fix",
+      name: T.cmd.fix,
+      callback: () => {
+        const domains = this.controller.loadDomains();
+        new DomainModal(
+          this.app,
+          T.cmd.fix,
+          true,
+          null,
+          domains,
+          (d) => void this.controller.fix(d)
         ).open();
       }
     });

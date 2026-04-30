@@ -6,8 +6,7 @@ export type WikiOperation =
   | "query"
   | "query-save"
   | "lint"
-  | "init"
-  | "fix";
+  | "init";
 
 export type WikiDomain = string;
 
@@ -18,7 +17,6 @@ export interface RunRequest {
   signal: AbortSignal;
   timeoutMs: number;
   domainId?: string;
-  lintReport?: string;
 }
 
 export type RunEvent =
@@ -69,7 +67,7 @@ export type LlmClient = {
   };
 };
 
-export type OpKey = "ingest" | "query" | "lint" | "init" | "fix";
+export type OpKey = "ingest" | "query" | "lint" | "init";
 export type OpMap<T> = Record<OpKey, T>;
 
 export interface ClaudeOperationConfig {
@@ -95,7 +93,6 @@ export interface LlmWikiPluginSettings {
     query: number;
     lint: number;
     init: number;
-    fix: number;
   };
   history: RunHistoryEntry[];
   claudeAgent: {
@@ -123,7 +120,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600, fix: 300 },
+  timeouts: { ingest: 300, query: 300, lint: 900, init: 3600 },
   history: [],
   claudeAgent: {
     iclaudePath: "",
@@ -132,9 +129,8 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
     operations: {
       ingest: { model: "haiku",  maxTokens: 4096 },
       query:  { model: "sonnet", maxTokens: 4096 },
-      lint:   { model: "haiku",  maxTokens: 4096 },
+      lint:   { model: "sonnet", maxTokens: 8192 },
       init:   { model: "sonnet", maxTokens: 8192 },
-      fix:    { model: "sonnet", maxTokens: 8192 },
     },
   },
   nativeAgent: {
@@ -148,9 +144,8 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
     operations: {
       ingest: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
       query:  { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
-      lint:   { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
+      lint:   { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
       init:   { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
-      fix:    { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
     },
   },
 };

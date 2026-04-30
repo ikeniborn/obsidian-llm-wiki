@@ -161,6 +161,6 @@ describe("runIngest", () => {
     );
     const result = events.find((e: any) => e.kind === "result") as any;
     expect(result).toBeDefined();
-    expect(result.text).toMatch(/0/);
+    expect(result.text).toMatch(/новых или изменённых страниц нет/);
   });
 });

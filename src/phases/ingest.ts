@@ -79,7 +79,7 @@ export async function* runIngest(
     for await (const chunk of stream) {
       const { reasoning, content } = extractStreamDeltas(chunk);
       if (reasoning) yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-      if (content) { fullText += content; yield { kind: "assistant_text", delta: content }; }
+      if (content) fullText += content;
     }
   } catch (e) {
     if (signal.aborted || (e as Error).name === "AbortError") return;
@@ -87,7 +87,6 @@ export async function* runIngest(
       { ...params, stream: false } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
     );
     fullText = resp.choices[0]?.message?.content ?? "";
-    if (fullText) yield { kind: "assistant_text", delta: fullText };
   }
 
   if (signal.aborted) return;
@@ -105,6 +104,9 @@ export async function* runIngest(
     }
   }
 
+  const resultText = buildIngestSummary(domain.id, sourceVaultPath, written, pages.length);
+  yield { kind: "assistant_text", delta: resultText };
+
   if (written.length > 0) {
     await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
     await updateIndex(vaultTools, wikiRoot, written);
@@ -119,11 +121,20 @@ export async function* runIngest(
     }
   }
 
-  yield {
-    kind: "result",
-    durationMs: Date.now() - start,
-    text: pages.length > 0 ? `Ingested into ${pages.length} wiki page(s).` : "Ingested into 0 wiki page(s).",
-  };
+  yield { kind: "result", durationMs: Date.now() - start, text: resultText };
+}
+
+function buildIngestSummary(domainId: string, sourcePath: string, written: string[], total: number): string {
+  const src = sourcePath.split("/").pop() ?? sourcePath;
+  if (written.length === 0) {
+    return `Источник «${src}» обработан — новых или изменённых страниц нет.`;
+  }
+  const skipped = total - written.length;
+  const lines = [`Источник «${src}» → домен «${domainId}»: записано ${written.length} стр.${skipped > 0 ? `, ошибок ${skipped}` : ""}`];
+  for (const p of written) {
+    lines.push(`  • ${p.split("/").pop()}`);
+  }
+  return lines.join("\n");
 }
 
 export function detectDomain(absFilePath: string, domains: DomainEntry[], repoRoot: string): DomainEntry | null {

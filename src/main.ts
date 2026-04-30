@@ -67,16 +67,6 @@ export default class LlmWikiPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "fix",
-      name: T.cmd.fix,
-      callback: () => {
-        const domains = this.controller.loadDomains();
-        new DomainModal(this.app, T.cmd.fix, true, null, domains,
-          (d) => void this.controller.fix(d)).open();
-      },
-    });
-
-    this.addCommand({
       id: "init",
       name: T.cmd.init,
       callback: () => {

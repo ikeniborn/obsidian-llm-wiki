@@ -1,5 +1,5 @@
 import { App, ItemView, Modal, WorkspaceLeaf, MarkdownRenderer, Component, Notice } from "obsidian";
-import { AddDomainModal, ConfirmModal, FixFromLintModal } from "./modals";
+import { AddDomainModal, ConfirmModal } from "./modals";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
 import { i18n } from "./i18n";
@@ -34,7 +34,6 @@ export class LlmWikiView extends ItemView {
   private initBtn!: HTMLButtonElement;
   private ingestBtn!: HTMLButtonElement;
   private lintBtn!: HTMLButtonElement;
-  private fixBtn!: HTMLButtonElement;
   private startTs = 0;
   private toolCount = 0;
   private stepCount = 0;
@@ -78,7 +77,6 @@ export class LlmWikiView extends ItemView {
     this.initBtn = actionRow.createEl("button", { text: T.view.init });
     this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
     this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
-    this.fixBtn = actionRow.createEl("button", { text: T.view.fix });
 
     this.domainSelect.addEventListener("change", () => this.updateInitBtn());
 
@@ -107,17 +105,6 @@ export class LlmWikiView extends ItemView {
         "Claude will check wiki pages for quality and update entity_types.",
       ], () => void this.plugin.controller.lint(d || "all")).open();
     });
-    this.fixBtn.addEventListener("click", () => {
-      const d = this.domainSelect.value;
-      if (!d) { new Notice(i18n().view.selectDomainForInit); return; }
-      const lintEntries = this.plugin.settings.history.filter(
-        (h) => h.operation === "lint" && (h.args.length === 0 || h.args.includes(d)) && h.finalText,
-      );
-      new FixFromLintModal(this.plugin.app, d, lintEntries,
-        (lintReport) => void this.plugin.controller.fix(d, lintReport),
-      ).open();
-    });
-
     this.refreshDomains();
 
     // Inline query input
@@ -233,7 +220,6 @@ export class LlmWikiView extends ItemView {
     this.initBtn.disabled = true;
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
-    this.fixBtn.disabled = true;
 
     this.resultSection.addClass("llm-wiki-hidden");
     this.finalEl.empty();
@@ -345,7 +331,6 @@ export class LlmWikiView extends ItemView {
     this.askSaveBtn.disabled = false;
     this.ingestBtn.disabled = false;
     this.lintBtn.disabled = false;
-    this.fixBtn.disabled = false;
     this.updateInitBtn();
     if (this.tickHandle !== null) { window.clearInterval(this.tickHandle); this.tickHandle = null; }
     this.stepsOpen = false;

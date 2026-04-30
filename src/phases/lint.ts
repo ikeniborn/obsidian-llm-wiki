@@ -4,6 +4,7 @@ import type { DomainEntry, EntityType } from "../domain-map";
 import type { LlmCallOptions, RunEvent, LlmClient } from "../types";
 import type { VaultTools } from "../vault-tools";
 import { buildChatParams, extractStreamDeltas } from "./llm-utils";
+import { parseJsonPages } from "./ingest";
 
 const META_FILES = ["_index.md", "_log.md", "_schema.md"];
 
@@ -104,6 +105,44 @@ export async function* runLint(
       reportParts.push(diffReport);
       yield { kind: "domain_updated", domainId: domain.id, patch };
     }
+
+    if (signal.aborted) return;
+    yield { kind: "assistant_text", delta: `\nApplying fixes for "${domain.id}"...\n` };
+    const fixMessages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, llmReport);
+    const fixParams = buildChatParams(model, fixMessages, opts);
+    let fixFullText = "";
+    try {
+      const fixStream = await llm.chat.completions.create(
+        { ...fixParams, stream: true } as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+        { signal },
+      );
+      for await (const chunk of fixStream) {
+        const { content } = extractStreamDeltas(chunk);
+        if (content) fixFullText += content;
+      }
+    } catch (e) {
+      if (signal.aborted || (e as Error).name === "AbortError") return;
+      const resp = await llm.chat.completions.create(
+        { ...fixParams, stream: false } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+      );
+      fixFullText = resp.choices[0]?.message?.content ?? "";
+    }
+
+    const fixedPages = parseJsonPages(fixFullText);
+    const writtenPaths: string[] = [];
+    for (const page of fixedPages) {
+      yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+      try {
+        await vaultTools.write(page.path, page.content);
+        writtenPaths.push(page.path);
+        yield { kind: "tool_result", ok: true };
+      } catch (e) {
+        yield { kind: "tool_result", ok: false, preview: (e as Error).message };
+      }
+    }
+    if (writtenPaths.length > 0) {
+      reportParts.push(`### Исправлено страниц: ${writtenPaths.length}\n${writtenPaths.map((p) => `- ${p.split("/").pop()}`).join("\n")}`);
+    }
   }
 
   yield { kind: "result", durationMs: Date.now() - start, text: reportParts.join("\n\n---\n\n") };
@@ -146,6 +185,40 @@ function computeEntityDiff(oldTypes: EntityType[], newTypes: EntityType[]): stri
   removed.forEach((et) => lines.push(`- ✖ удалён: **${et.type}**`));
   modified.forEach((et) => lines.push(`- ✎ обновлён: **${et.type}**`));
   return lines.join("\n");
+}
+
+function buildFixMessages(
+  domain: DomainEntry,
+  wikiVaultPath: string,
+  pages: Map<string, string>,
+  structuralIssues: string,
+  entityTypesBlock: string,
+  lintReport: string,
+): OpenAI.Chat.ChatCompletionMessageParam[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const pagesBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---\n${c}`).join("\n\n");
+  return [
+    {
+      role: "system",
+      content: [
+        `Ты — редактор wiki-базы знаний домена «${domain.name}».`,
+        `Исправь проблемы в wiki-страницах и верни только изменённые страницы.`,
+        `ПРАВИЛА: мёртвые ссылки [[X]] убери или замени; отсутствующий frontmatter добавь (wiki_updated: ${today}, wiki_status: stub); дублирование объедини; размытые определения уточни.`,
+        entityTypesBlock ? `\nТИПЫ СУЩНОСТЕЙ:\n${entityTypesBlock}` : "",
+        `\nВерни ТОЛЬКО JSON-массив изменённых страниц:`,
+        `[{"path":"${wikiVaultPath}/EntityName.md","content":"полный контент"}]`,
+      ].filter(Boolean).join("\n"),
+    },
+    {
+      role: "user",
+      content: [
+        `Домен: ${domain.id} (${domain.name})`,
+        structuralIssues ? `\nСтруктурные проблемы:\n${structuralIssues}` : "\nСтруктурных проблем не обнаружено.",
+        `\nОтчёт Lint (рекомендации):\n${lintReport}`,
+        `\nWiki-страницы:\n${pagesBlock}`,
+      ].join("\n"),
+    },
+  ];
 }
 
 async function actualizeDomainConfig(
