@@ -3,9 +3,6 @@ var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -20,92 +17,6 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// src/domain-map.ts
-var domain_map_exports = {};
-__export(domain_map_exports, {
-  addDomain: () => addDomain,
-  domainMapPath: () => domainMapPath,
-  readDomains: () => readDomains
-});
-function domainMapPath(dir, vaultName) {
-  return (0, import_node_path.join)(dir, `domain-map-${vaultName}.json`);
-}
-function readDomains(dir, vaultName) {
-  const p = domainMapPath(dir, vaultName);
-  if (!(0, import_node_fs.existsSync)(p))
-    return [];
-  try {
-    const data = JSON.parse((0, import_node_fs.readFileSync)(p, "utf-8"));
-    return (data.domains ?? []).map((d) => ({
-      id: d.id,
-      name: d.name ?? d.id,
-      wiki_folder: d.wiki_folder ?? "",
-      source_paths: d.source_paths ?? [],
-      entity_types: d.entity_types ?? [],
-      language_notes: d.language_notes ?? ""
-    }));
-  } catch {
-    return [];
-  }
-}
-function addDomain(dir, vaultName, repoRoot, input) {
-  const id = input.id.trim();
-  if (!id)
-    return { ok: false, error: "ID \u0434\u043E\u043C\u0435\u043D\u0430 \u043F\u0443\u0441\u0442" };
-  if (!/^[\p{L}\p{N}_-]+$/u.test(id))
-    return { ok: false, error: "ID \u0434\u043E\u043F\u0443\u0441\u043A\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B/\u0446\u0438\u0444\u0440\u044B/_/-" };
-  const p = domainMapPath(dir, vaultName);
-  let data;
-  if (!(0, import_node_fs.existsSync)(p)) {
-    (0, import_node_fs.mkdirSync)(dir, { recursive: true });
-    data = {
-      vault: vaultName,
-      wiki_root: `vaults/${vaultName}/!Wiki`,
-      domains: []
-    };
-  } else {
-    try {
-      data = JSON.parse((0, import_node_fs.readFileSync)(p, "utf-8"));
-    } catch (err) {
-      return { ok: false, error: `\u041D\u0435\u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON: ${err.message}` };
-    }
-  }
-  if (!Array.isArray(data.domains))
-    data.domains = [];
-  if (data.domains.some((d) => d.id === id))
-    return { ok: false, error: `\u0414\u043E\u043C\u0435\u043D \xAB${id}\xBB \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442` };
-  const wikiFolderRel = input.wikiFolder.trim() || `${data.wiki_root ?? `vaults/${vaultName}/!Wiki`}/${id}`;
-  data.domains.push({
-    id,
-    name: input.name.trim() || id,
-    wiki_folder: wikiFolderRel,
-    source_paths: input.sourcePaths.map((s) => s.trim()).filter(Boolean),
-    entity_types: [],
-    tags: [],
-    language_notes: ""
-  });
-  try {
-    (0, import_node_fs.writeFileSync)(p, JSON.stringify(data, null, 2) + "\n", "utf-8");
-  } catch (err) {
-    return { ok: false, error: `\u0417\u0430\u043F\u0438\u0441\u044C JSON: ${err.message}` };
-  }
-  if (repoRoot) {
-    try {
-      (0, import_node_fs.mkdirSync)((0, import_node_path.join)(repoRoot, wikiFolderRel), { recursive: true });
-    } catch {
-    }
-  }
-  return { ok: true };
-}
-var import_node_fs, import_node_path;
-var init_domain_map = __esm({
-  "src/domain-map.ts"() {
-    "use strict";
-    import_node_fs = require("node:fs");
-    import_node_path = require("node:path");
-  }
-});
-
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
@@ -118,7 +29,7 @@ var import_obsidian6 = require("obsidian");
 var DEFAULT_SETTINGS = {
   backend: "claude-agent",
   systemPrompt: "You are a wiki assistant for a technical knowledge base. Be precise, factual, and concise. Use only the provided sources.",
-  domainMapDir: "",
+  domains: [],
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
@@ -153,6 +64,9 @@ var DEFAULT_SETTINGS = {
 };
 
 // src/settings.ts
+var import_obsidian3 = require("obsidian");
+
+// src/modals.ts
 var import_obsidian2 = require("obsidian");
 
 // src/i18n.ts
@@ -165,9 +79,12 @@ var en = {
     systemPrompt_desc: "System prompt for all operations. Used by both backends.",
     maxTokens_name: "Max tokens",
     maxTokens_desc: "Maximum tokens in the response. Recommended \u2265 4096.",
-    domainMapDir_name: "Domain-map folder",
-    domainMapDir_desc: "Where to store domain-map-<vault>.json. Empty \u2014 auto: <vault>/<configDir>/plugins/obsidian-llm-wiki/",
-    domainMapDir_placeholder: "(auto)",
+    domains_heading: "Domains",
+    editDomain: "Edit",
+    deleteDomain: "Delete",
+    confirmDeleteDomain: (id) => `Delete domain "${id}"?`,
+    domainDeleted: (id) => `Domain \xAB${id}\xBB deleted`,
+    domains_empty: "No domains. Use 'Add domain' in the sidebar panel to create one.",
     timeouts_name: "Timeouts (seconds)",
     timeouts_desc: "ingest / query / lint / init",
     historyLimit_name: "History limit",
@@ -207,7 +124,7 @@ var en = {
     opTemperature_desc: "Temperature for this operation (0\u20132)."
   },
   view: {
-    refreshTitle: "Reload domain-map.json",
+    refreshTitle: "Refresh domains",
     addDomain: "Add domain",
     ingest: "Ingest",
     lint: "Lint",
@@ -269,8 +186,14 @@ var en = {
     sourcePaths_name: "Source paths",
     sourcePaths_desc: "Comma-separated list. Defaults to wiki folder.",
     sourcePaths_placeholder: "vaults/Work/Projects/",
-    addDomainNote: "The entry will be added to domain-map-<vault>.json with empty entity_types. For full ingest, edit the JSON and add entity_types/extraction_cues.",
-    add: "Add"
+    addDomainNote: "The entry will be saved in plugin settings with empty entity_types. Edit the domain in Settings \u2192 Domains to add entity_types/extraction_cues.",
+    add: "Add",
+    editDomainTitle: (id) => `Edit domain: ${id}`,
+    entityTypesLabel: "Entity types (JSON array)",
+    entityTypesError: "Invalid JSON array \u2014 must be an array of objects",
+    sourcePathsLabel: "Source paths (one per line)",
+    languageNotesLabel: "Language notes",
+    save: "Save"
   }
 };
 var ru = {
@@ -281,9 +204,12 @@ var ru = {
     systemPrompt_desc: "\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0439 \u043F\u0440\u043E\u043C\u0442 \u0434\u043B\u044F \u0432\u0441\u0435\u0445 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0439. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442\u0441\u044F \u043E\u0431\u043E\u0438\u043C\u0438 \u0431\u044D\u043A\u0435\u043D\u0434\u0430\u043C\u0438.",
     maxTokens_name: "Max tokens",
     maxTokens_desc: "\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u0432 \u0432 \u043E\u0442\u0432\u0435\u0442\u0435. \u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F \u2265 4096.",
-    domainMapDir_name: "\u041F\u0430\u043F\u043A\u0430 domain-map",
-    domainMapDir_desc: "\u0413\u0434\u0435 \u0445\u0440\u0430\u043D\u0438\u0442\u044C domain-map-<vault>.json. \u041F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E: <vault>/<configDir>/plugins/obsidian-llm-wiki/",
-    domainMapDir_placeholder: "(\u0430\u0432\u0442\u043E)",
+    domains_heading: "\u0414\u043E\u043C\u0435\u043D\u044B",
+    editDomain: "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C",
+    deleteDomain: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C",
+    confirmDeleteDomain: (id) => `\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D \xAB${id}\xBB?`,
+    domainDeleted: (id) => `\u0414\u043E\u043C\u0435\u043D \xAB${id}\xBB \u0443\u0434\u0430\u043B\u0451\u043D`,
+    domains_empty: "\u0414\u043E\u043C\u0435\u043D\u044B \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u044B. \u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 '\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D' \u0432 \u0431\u043E\u043A\u043E\u0432\u043E\u0439 \u043F\u0430\u043D\u0435\u043B\u0438.",
     timeouts_name: "\u0422\u0430\u0439\u043C\u0430\u0443\u0442\u044B (\u0441\u0435\u043A\u0443\u043D\u0434\u044B)",
     timeouts_desc: "ingest / query / lint / init",
     historyLimit_name: "\u041B\u0438\u043C\u0438\u0442 \u0438\u0441\u0442\u043E\u0440\u0438\u0438",
@@ -323,7 +249,7 @@ var ru = {
     opTemperature_desc: "Temperature \u0434\u043B\u044F \u044D\u0442\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438 (0\u20132)."
   },
   view: {
-    refreshTitle: "\u041F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C domain-map.json",
+    refreshTitle: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D\u044B",
     addDomain: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D",
     ingest: "Ingest",
     lint: "Lint",
@@ -385,8 +311,14 @@ var ru = {
     sourcePaths_name: "Source paths",
     sourcePaths_desc: "\u0421\u043F\u0438\u0441\u043E\u043A \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E. \u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442 \u0441 wiki folder.",
     sourcePaths_placeholder: "vaults/Work/\u041F\u0440\u043E\u0435\u043A\u0442\u044B/",
-    addDomainNote: "\u0417\u0430\u043F\u0438\u0441\u044C \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u0441\u044F \u0432 domain-map-<vault>.json \u0441 \u043F\u0443\u0441\u0442\u044B\u043C\u0438 entity_types. \u0414\u043B\u044F \u043F\u043E\u043B\u043D\u043E\u0446\u0435\u043D\u043D\u043E\u0433\u043E ingest \u043F\u043E\u0437\u0436\u0435 \u043E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u0443\u0439\u0442\u0435 JSON \u0438 \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435 entity_types/extraction_cues.",
-    add: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C"
+    addDomainNote: "\u0417\u0430\u043F\u0438\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u0441\u044F \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u043F\u043B\u0430\u0433\u0438\u043D\u0430 \u0441 \u043F\u0443\u0441\u0442\u044B\u043C\u0438 entity_types. \u041E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0434\u043E\u043C\u0435\u043D \u0432 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u2192 \u0414\u043E\u043C\u0435\u043D\u044B \u0434\u043B\u044F \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u044F entity_types/extraction_cues.",
+    add: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C",
+    editDomainTitle: (id) => `\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0434\u043E\u043C\u0435\u043D\u0430: ${id}`,
+    entityTypesLabel: "\u0422\u0438\u043F\u044B \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0435\u0439 (JSON-\u043C\u0430\u0441\u0441\u0438\u0432)",
+    entityTypesError: "\u041D\u0435\u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u2014 \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043C\u0430\u0441\u0441\u0438\u0432\u043E\u043C \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432",
+    sourcePathsLabel: "\u041F\u0443\u0442\u0438 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u043E\u0432 (\u043F\u043E \u043E\u0434\u043D\u043E\u043C\u0443 \u043D\u0430 \u0441\u0442\u0440\u043E\u043A\u0443)",
+    languageNotesLabel: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438 \u043E \u044F\u0437\u044B\u043A\u0435",
+    save: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C"
   }
 };
 var es = {
@@ -397,9 +329,12 @@ var es = {
     systemPrompt_desc: "Prompt del sistema para todas las operaciones. Usado por ambos backends.",
     maxTokens_name: "M\xE1x. tokens",
     maxTokens_desc: "M\xE1ximo de tokens en la respuesta. Recomendado \u2265 4096.",
-    domainMapDir_name: "Carpeta domain-map",
-    domainMapDir_desc: "D\xF3nde guardar domain-map-<vault>.json. Vac\xEDo \u2014 auto: <vault>/<configDir>/plugins/obsidian-llm-wiki/",
-    domainMapDir_placeholder: "(auto)",
+    domains_heading: "Dominios",
+    editDomain: "Editar",
+    deleteDomain: "Eliminar",
+    confirmDeleteDomain: (id) => `\xBFEliminar dominio "${id}"?`,
+    domainDeleted: (id) => `Dominio \xAB${id}\xBB eliminado`,
+    domains_empty: "No hay dominios. Use 'A\xF1adir dominio' en el panel lateral.",
     timeouts_name: "Tiempos de espera (segundos)",
     timeouts_desc: "ingest / query / lint / init",
     historyLimit_name: "L\xEDmite de historial",
@@ -439,7 +374,7 @@ var es = {
     opTemperature_desc: "Temperatura para esta operaci\xF3n (0\u20132)."
   },
   view: {
-    refreshTitle: "Recargar domain-map.json",
+    refreshTitle: "Actualizar dominios",
     addDomain: "A\xF1adir dominio",
     ingest: "Ingest",
     lint: "Lint",
@@ -501,8 +436,14 @@ var es = {
     sourcePaths_name: "Rutas de fuentes",
     sourcePaths_desc: "Lista separada por comas. Por defecto coincide con la carpeta wiki.",
     sourcePaths_placeholder: "vaults/Work/Proyectos/",
-    addDomainNote: "La entrada se a\xF1adir\xE1 a domain-map-<vault>.json con entity_types vac\xEDos. Para ingest completo, edita el JSON y a\xF1ade entity_types/extraction_cues.",
-    add: "A\xF1adir"
+    addDomainNote: "La entrada se guardar\xE1 en la configuraci\xF3n del plugin con entity_types vac\xEDos. Edita el dominio en Ajustes \u2192 Dominios para a\xF1adir entity_types/extraction_cues.",
+    add: "A\xF1adir",
+    editDomainTitle: (id) => `Editar dominio: ${id}`,
+    entityTypesLabel: "Tipos de entidad (array JSON)",
+    entityTypesError: "Array JSON inv\xE1lido \u2014 debe ser un array de objetos",
+    sourcePathsLabel: "Rutas de origen (una por l\xEDnea)",
+    languageNotesLabel: "Notas de idioma",
+    save: "Guardar"
   }
 };
 var locales = { ru, es };
@@ -511,8 +452,261 @@ function i18n() {
   return locales[locale] ?? en;
 }
 
+// src/modals.ts
+var ConfirmModal = class extends import_obsidian2.Modal {
+  constructor(app, title, lines, onConfirm) {
+    super(app);
+    this.title = title;
+    this.lines = lines;
+    this.onConfirm = onConfirm;
+  }
+  onOpen() {
+    const T = i18n().modal;
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.title });
+    for (const line of this.lines) {
+      contentEl.createEl("p", { text: line });
+    }
+    new import_obsidian2.Setting(contentEl).addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close())).addButton((b) => b.setButtonText(`\u25B6 ${T.run}`).setCta().onClick(() => {
+      this.close();
+      this.onConfirm();
+    }));
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var QueryModal = class extends import_obsidian2.Modal {
+  constructor(app, save, onSubmit) {
+    super(app);
+    this.save = save;
+    this.onSubmit = onSubmit;
+  }
+  question = "";
+  onOpen() {
+    const T = i18n().modal;
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.save ? T.queryAndSave : T.query });
+    const ta = contentEl.createEl("textarea", {
+      attr: { rows: "5", style: "width:100%;" },
+      placeholder: T.queryPlaceholder
+    });
+    ta.addEventListener("input", () => {
+      this.question = ta.value;
+    });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(`\u25B6 ${T.run}`).setCta().onClick(() => {
+        const q = this.question.trim();
+        if (!q)
+          return;
+        this.close();
+        this.onSubmit(q);
+      })
+    );
+    setTimeout(() => ta.focus(), 0);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var DomainModal = class extends import_obsidian2.Modal {
+  constructor(app, title, allowAll, extra, domains, onSubmit) {
+    super(app);
+    this.title = title;
+    this.allowAll = allowAll;
+    this.extra = extra;
+    this.domains = domains;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const T = i18n().modal;
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: this.title });
+    let domain = this.allowAll ? "all" : this.domains[0]?.id ?? "";
+    let dryRun = false;
+    if (this.domains.length === 0) {
+      new import_obsidian2.Setting(contentEl).setName(T.domain_name).setDesc(T.noDomains_desc).addText((t) => t.setPlaceholder(T.domainIdPlaceholder).onChange((v) => {
+        domain = v.trim();
+      }));
+    } else {
+      new import_obsidian2.Setting(contentEl).setName(T.domain_name).addDropdown((d) => {
+        if (this.allowAll)
+          d.addOption("all", T.allWiki);
+        for (const entry of this.domains) {
+          d.addOption(entry.id, entry.name || entry.id);
+        }
+        d.setValue(domain);
+        d.onChange((v) => {
+          domain = v;
+        });
+      });
+    }
+    if (this.extra && "dryRun" in this.extra) {
+      new import_obsidian2.Setting(contentEl).setName(T.dryRun_name).addToggle((t) => t.onChange((v) => {
+        dryRun = v;
+      }));
+    }
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(`\u25B6 ${T.run}`).setCta().onClick(() => {
+        this.close();
+        this.onSubmit(domain, { dryRun });
+      })
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+function defaultSourcePaths(wikiFolder) {
+  return wikiFolder ? [wikiFolder] : [];
+}
+var AddDomainModal = class extends import_obsidian2.Modal {
+  constructor(app, wikiRoot, onSubmit) {
+    super(app);
+    this.wikiRoot = wikiRoot;
+    this.onSubmit = onSubmit;
+  }
+  input = { id: "", name: "", wikiFolder: "", sourcePaths: [] };
+  wikiFolderInput = null;
+  sourcePathsInput = null;
+  sourcePathsTouched = false;
+  onOpen() {
+    const T = i18n().modal;
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: T.addDomain });
+    new import_obsidian2.Setting(contentEl).setName(T.id_name).setDesc(T.id_desc).addText(
+      (t) => t.setPlaceholder(T.idPlaceholder).onChange((v) => {
+        this.input.id = v.trim();
+        if (this.wikiFolderInput && !this.input.wikiFolder) {
+          const auto = `${this.wikiRoot}/${this.input.id}`;
+          this.wikiFolderInput.setValue(auto);
+          if (!this.sourcePathsTouched && this.sourcePathsInput) {
+            this.sourcePathsInput.setValue(auto);
+            this.input.sourcePaths = defaultSourcePaths(auto);
+          }
+        }
+      })
+    );
+    new import_obsidian2.Setting(contentEl).setName(T.displayName_name).addText((t) => t.setPlaceholder(T.idPlaceholder).onChange((v) => {
+      this.input.name = v.trim();
+    }));
+    new import_obsidian2.Setting(contentEl).setName(T.wikiFolder_name).setDesc(T.wikiFolder_desc(this.wikiRoot)).addText((t) => {
+      t.setPlaceholder(T.wikiFolder_placeholder(this.wikiRoot)).onChange((v) => {
+        this.input.wikiFolder = v.trim();
+        if (!this.sourcePathsTouched && this.sourcePathsInput) {
+          this.sourcePathsInput.setValue(v.trim());
+          this.input.sourcePaths = defaultSourcePaths(v.trim());
+        }
+      });
+      this.wikiFolderInput = t;
+    });
+    new import_obsidian2.Setting(contentEl).setName(T.sourcePaths_name).setDesc(T.sourcePaths_desc).addText((t) => {
+      t.setPlaceholder(T.sourcePaths_placeholder).onChange((v) => {
+        this.sourcePathsTouched = true;
+        this.input.sourcePaths = v.split(",").map((s) => s.trim()).filter(Boolean);
+      });
+      this.sourcePathsInput = t;
+    });
+    contentEl.createEl("p", { text: T.addDomainNote, cls: "muted" });
+    new import_obsidian2.Setting(contentEl).addButton(
+      (b) => b.setButtonText(T.add).setCta().onClick(() => {
+        if (!this.input.id)
+          return;
+        this.close();
+        this.onSubmit(this.input);
+      })
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var EditDomainModal = class extends import_obsidian2.Modal {
+  constructor(app, domain, onSave) {
+    super(app);
+    this.domain = domain;
+    this.onSave = onSave;
+    this.nameVal = domain.name;
+    this.wikiFolderVal = domain.wiki_folder;
+    this.sourcePathsVal = (domain.source_paths ?? []).join("\n");
+    this.entityTypesVal = JSON.stringify(domain.entity_types ?? [], null, 2);
+    this.languageNotesVal = domain.language_notes ?? "";
+  }
+  nameVal;
+  wikiFolderVal;
+  sourcePathsVal;
+  entityTypesVal;
+  languageNotesVal;
+  errorEl = null;
+  onOpen() {
+    const T = i18n().modal;
+    const { contentEl } = this;
+    contentEl.createEl("h3", { text: T.editDomainTitle(this.domain.id) });
+    new import_obsidian2.Setting(contentEl).setName(T.displayName_name).addText((t) => t.setValue(this.nameVal).onChange((v) => {
+      this.nameVal = v;
+    }));
+    new import_obsidian2.Setting(contentEl).setName(T.wikiFolder_name).addText((t) => t.setValue(this.wikiFolderVal).onChange((v) => {
+      this.wikiFolderVal = v;
+    }));
+    new import_obsidian2.Setting(contentEl).setName(T.sourcePathsLabel).setDesc(T.sourcePaths_desc).addTextArea((t) => {
+      t.inputEl.rows = 4;
+      t.inputEl.style.width = "100%";
+      t.setValue(this.sourcePathsVal).onChange((v) => {
+        this.sourcePathsVal = v;
+      });
+    });
+    new import_obsidian2.Setting(contentEl).setName(T.entityTypesLabel).addTextArea((t) => {
+      t.inputEl.rows = 10;
+      t.inputEl.style.width = "100%";
+      t.inputEl.style.fontFamily = "monospace";
+      t.setValue(this.entityTypesVal).onChange((v) => {
+        this.entityTypesVal = v;
+      });
+    });
+    new import_obsidian2.Setting(contentEl).setName(T.languageNotesLabel).addText((t) => t.setValue(this.languageNotesVal).onChange((v) => {
+      this.languageNotesVal = v;
+    }));
+    this.errorEl = contentEl.createEl("p", { cls: "mod-warning" });
+    this.errorEl.style.display = "none";
+    new import_obsidian2.Setting(contentEl).addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close())).addButton((b) => b.setButtonText(T.save).setCta().onClick(() => this.handleSave()));
+  }
+  handleSave() {
+    if (this.errorEl)
+      this.errorEl.style.display = "none";
+    let entityTypes;
+    try {
+      const parsed = JSON.parse(this.entityTypesVal.trim() || "[]");
+      if (!Array.isArray(parsed))
+        throw new Error("not an array");
+      if (!parsed.every((x) => typeof x === "object" && x !== null && !Array.isArray(x))) {
+        throw new Error("not an array of objects");
+      }
+      entityTypes = parsed;
+    } catch {
+      if (this.errorEl) {
+        this.errorEl.textContent = i18n().modal.entityTypesError;
+        this.errorEl.style.display = "";
+      }
+      return;
+    }
+    const updated = {
+      ...this.domain,
+      name: this.nameVal.trim() || this.domain.name,
+      wiki_folder: this.wikiFolderVal.trim() || this.domain.wiki_folder,
+      source_paths: this.sourcePathsVal.split("\n").map((s) => s.trim()).filter(Boolean),
+      entity_types: entityTypes,
+      language_notes: this.languageNotesVal.trim()
+    };
+    this.close();
+    this.onSave(updated);
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
 // src/settings.ts
-var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
+var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -522,8 +716,8 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
     containerEl.empty();
     const s = this.plugin.settings;
     const T = i18n();
-    new import_obsidian2.Setting(containerEl).setName(T.settings.h3_general).setHeading();
-    new import_obsidian2.Setting(containerEl).setName(T.settings.systemPrompt_name).setDesc(T.settings.systemPrompt_desc).addTextArea((t) => {
+    new import_obsidian3.Setting(containerEl).setName(T.settings.h3_general).setHeading();
+    new import_obsidian3.Setting(containerEl).setName(T.settings.systemPrompt_name).setDesc(T.settings.systemPrompt_desc).addTextArea((t) => {
       t.inputEl.addClass("llm-wiki-settings-textarea");
       t.setValue(s.systemPrompt).onChange(async (v) => {
         s.systemPrompt = v;
@@ -533,7 +727,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
     });
     const isPerOp = s.backend === "claude-agent" ? s.claudeAgent.perOperation : s.nativeAgent.perOperation;
     if (!isPerOp) {
-      new import_obsidian2.Setting(containerEl).setName(T.settings.maxTokens_name).setDesc(T.settings.maxTokens_desc).addText(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.maxTokens_name).setDesc(T.settings.maxTokens_desc).addText(
         (t) => t.setPlaceholder("4096").setValue(String(s.maxTokens)).onChange(async (v) => {
           const n = Number(v);
           if (Number.isFinite(n) && n > 0) {
@@ -543,13 +737,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
         })
       );
     }
-    new import_obsidian2.Setting(containerEl).setName(T.settings.domainMapDir_name).setDesc(T.settings.domainMapDir_desc).addText(
-      (t) => t.setPlaceholder(T.settings.domainMapDir_placeholder).setValue(s.domainMapDir).onChange(async (v) => {
-        s.domainMapDir = v.trim();
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName(T.settings.timeouts_name).setDesc(T.settings.timeouts_desc).addText(
+    new import_obsidian3.Setting(containerEl).setName(T.settings.timeouts_name).setDesc(T.settings.timeouts_desc).addText(
       (t) => t.setValue(`${s.timeouts.ingest}/${s.timeouts.query}/${s.timeouts.lint}/${s.timeouts.init}`).onChange(async (v) => {
         const parts = v.split("/").map((x) => Number(x.trim()));
         if (parts.length === 4 && parts.every((n) => Number.isFinite(n) && n > 0)) {
@@ -558,7 +746,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName(T.settings.historyLimit_name).setDesc(T.settings.historyLimit_desc).addText(
+    new import_obsidian3.Setting(containerEl).setName(T.settings.historyLimit_name).setDesc(T.settings.historyLimit_desc).addText(
       (t) => t.setValue(String(s.historyLimit)).onChange(async (v) => {
         const n = Number(v);
         if (Number.isFinite(n) && n > 0) {
@@ -567,14 +755,44 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName(T.settings.agentLog_name).setDesc(T.settings.agentLog_desc).addText(
+    new import_obsidian3.Setting(containerEl).setName(T.settings.agentLog_name).setDesc(T.settings.agentLog_desc).addText(
       (t) => t.setPlaceholder("/tmp/llm-wiki-agent.jsonl").setValue(s.agentLogPath).onChange(async (v) => {
         s.agentLogPath = v.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName(T.settings.h3_backend).setHeading();
-    new import_obsidian2.Setting(containerEl).setName(T.settings.backend_name).setDesc(T.settings.backend_desc).addDropdown(
+    new import_obsidian3.Setting(containerEl).setName(T.settings.domains_heading).setHeading();
+    const domains = s.domains ?? [];
+    if (domains.length === 0) {
+      containerEl.createEl("p", {
+        text: T.settings.domains_empty,
+        cls: "setting-item-description"
+      });
+    } else {
+      for (let i = 0; i < domains.length; i++) {
+        const d = domains[i];
+        new import_obsidian3.Setting(containerEl).setName(d.name || d.id).setDesc(d.id).addButton(
+          (b) => b.setButtonText(T.settings.editDomain).onClick(() => {
+            new EditDomainModal(this.plugin.app, d, async (updated) => {
+              s.domains[i] = updated;
+              await this.plugin.saveSettings();
+              this.display();
+            }).open();
+          })
+        ).addButton(
+          (b) => b.setButtonText(T.settings.deleteDomain).setWarning().onClick(async () => {
+            if (!confirm(T.settings.confirmDeleteDomain(d.id)))
+              return;
+            new import_obsidian3.Notice(T.settings.domainDeleted(d.id));
+            s.domains.splice(i, 1);
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+      }
+    }
+    new import_obsidian3.Setting(containerEl).setName(T.settings.h3_backend).setHeading();
+    new import_obsidian3.Setting(containerEl).setName(T.settings.backend_name).setDesc(T.settings.backend_desc).addDropdown(
       (d) => d.addOption("claude-agent", T.settings.claudeCodeAgent).addOption("native-agent", T.settings.nativeAgent).setValue(s.backend).onChange(async (v) => {
         s.backend = v;
         await this.plugin.saveSettings();
@@ -582,21 +800,21 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     if (s.backend === "claude-agent") {
-      new import_obsidian2.Setting(containerEl).setName(T.settings.iclaudePath_name).setDesc(T.settings.iclaudePath_desc).addText(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.iclaudePath_name).setDesc(T.settings.iclaudePath_desc).addText(
         (t) => t.setPlaceholder("/home/user/Documents/Project/iclaude/iclaude.sh").setValue(s.claudeAgent.iclaudePath).onChange(async (v) => {
           s.claudeAgent.iclaudePath = v.trim();
           await this.plugin.saveSettings();
         })
       );
       if (!s.claudeAgent.perOperation) {
-        new import_obsidian2.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_claude).addText(
+        new import_obsidian3.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_claude).addText(
           (t) => t.setPlaceholder("sonnet").setValue(s.claudeAgent.model).onChange(async (v) => {
             s.claudeAgent.model = v.trim();
             await this.plugin.saveSettings();
           })
         );
       }
-      new import_obsidian2.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
         (t) => t.setValue(s.claudeAgent.perOperation).onChange(async (v) => {
           s.claudeAgent.perOperation = v;
           await this.plugin.saveSettings();
@@ -611,14 +829,14 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           { key: "init", label: T.settings.op_init }
         ];
         for (const { key, label } of ops) {
-          new import_obsidian2.Setting(containerEl).setName(label).setHeading();
-          new import_obsidian2.Setting(containerEl).setName(T.settings.opModel_name).setDesc(T.settings.opModel_desc).addText(
+          new import_obsidian3.Setting(containerEl).setName(label).setHeading();
+          new import_obsidian3.Setting(containerEl).setName(T.settings.opModel_name).setDesc(T.settings.opModel_desc).addText(
             (t) => t.setValue(s.claudeAgent.operations[key].model).onChange(async (v) => {
               s.claudeAgent.operations[key].model = v.trim();
               await this.plugin.saveSettings();
             })
           );
-          new import_obsidian2.Setting(containerEl).setName(T.settings.opMaxTokens_name).setDesc(T.settings.opMaxTokens_desc).addText(
+          new import_obsidian3.Setting(containerEl).setName(T.settings.opMaxTokens_name).setDesc(T.settings.opMaxTokens_desc).addText(
             (t) => t.setValue(String(s.claudeAgent.operations[key].maxTokens)).onChange(async (v) => {
               const n = Number(v);
               if (Number.isFinite(n) && n > 0) {
@@ -630,26 +848,26 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       }
     } else {
-      new import_obsidian2.Setting(containerEl).setName(T.settings.baseUrl_name).setDesc(T.settings.baseUrl_desc).addText(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.baseUrl_name).setDesc(T.settings.baseUrl_desc).addText(
         (t) => t.setPlaceholder("http://localhost:11434/v1").setValue(s.nativeAgent.baseUrl).onChange(async (v) => {
           s.nativeAgent.baseUrl = v.trim();
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian2.Setting(containerEl).setName(T.settings.apiKey_name).setDesc(T.settings.apiKey_desc).addText(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.apiKey_name).setDesc(T.settings.apiKey_desc).addText(
         (t) => t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
           s.nativeAgent.apiKey = v.trim();
           await this.plugin.saveSettings();
         })
       );
       if (!s.nativeAgent.perOperation) {
-        new import_obsidian2.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_native).addText(
+        new import_obsidian3.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_native).addText(
           (t) => t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
             s.nativeAgent.model = v.trim();
             await this.plugin.saveSettings();
           })
         );
-        new import_obsidian2.Setting(containerEl).setName(T.settings.temperature_name).setDesc(T.settings.temperature_desc).addText(
+        new import_obsidian3.Setting(containerEl).setName(T.settings.temperature_name).setDesc(T.settings.temperature_desc).addText(
           (t) => t.setPlaceholder("0.2").setValue(String(s.nativeAgent.temperature)).onChange(async (v) => {
             const n = Number(v);
             if (Number.isFinite(n) && n >= 0 && n <= 2) {
@@ -659,7 +877,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           })
         );
       }
-      new import_obsidian2.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
         (t) => t.setValue(s.nativeAgent.perOperation).onChange(async (v) => {
           s.nativeAgent.perOperation = v;
           await this.plugin.saveSettings();
@@ -674,14 +892,14 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           { key: "init", label: T.settings.op_init }
         ];
         for (const { key, label } of ops) {
-          new import_obsidian2.Setting(containerEl).setName(label).setHeading();
-          new import_obsidian2.Setting(containerEl).setName(T.settings.opModel_name).setDesc(T.settings.opModel_desc).addText(
+          new import_obsidian3.Setting(containerEl).setName(label).setHeading();
+          new import_obsidian3.Setting(containerEl).setName(T.settings.opModel_name).setDesc(T.settings.opModel_desc).addText(
             (t) => t.setValue(s.nativeAgent.operations[key].model).onChange(async (v) => {
               s.nativeAgent.operations[key].model = v.trim();
               await this.plugin.saveSettings();
             })
           );
-          new import_obsidian2.Setting(containerEl).setName(T.settings.opMaxTokens_name).setDesc(T.settings.opMaxTokens_desc).addText(
+          new import_obsidian3.Setting(containerEl).setName(T.settings.opMaxTokens_name).setDesc(T.settings.opMaxTokens_desc).addText(
             (t) => t.setValue(String(s.nativeAgent.operations[key].maxTokens)).onChange(async (v) => {
               const n = Number(v);
               if (Number.isFinite(n) && n > 0) {
@@ -690,7 +908,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
               }
             })
           );
-          new import_obsidian2.Setting(containerEl).setName(T.settings.opTemperature_name).setDesc(T.settings.opTemperature_desc).addText(
+          new import_obsidian3.Setting(containerEl).setName(T.settings.opTemperature_name).setDesc(T.settings.opTemperature_desc).addText(
             (t) => t.setValue(String(s.nativeAgent.operations[key].temperature)).onChange(async (v) => {
               const n = Number(v);
               if (Number.isFinite(n) && n >= 0 && n <= 2) {
@@ -701,7 +919,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           );
         }
       }
-      new import_obsidian2.Setting(containerEl).setName(T.settings.topP_name).setDesc(T.settings.topP_desc).addText(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.topP_name).setDesc(T.settings.topP_desc).addText(
         (t) => t.setPlaceholder("(\u043E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u043E)").setValue(s.nativeAgent.topP != null ? String(s.nativeAgent.topP) : "").onChange(async (v) => {
           const trimmed = v.trim();
           if (!trimmed) {
@@ -714,7 +932,7 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-      new import_obsidian2.Setting(containerEl).setName(T.settings.numCtx_name).setDesc(T.settings.numCtx_desc).addText(
+      new import_obsidian3.Setting(containerEl).setName(T.settings.numCtx_name).setDesc(T.settings.numCtx_desc).addText(
         (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
           const trimmed = v.trim();
           if (!trimmed) {
@@ -733,179 +951,6 @@ var LlmWikiSettingTab = class extends import_obsidian2.PluginSettingTab {
 
 // src/view.ts
 var import_obsidian4 = require("obsidian");
-
-// src/modals.ts
-var import_obsidian3 = require("obsidian");
-var ConfirmModal = class extends import_obsidian3.Modal {
-  constructor(app, title, lines, onConfirm) {
-    super(app);
-    this.title = title;
-    this.lines = lines;
-    this.onConfirm = onConfirm;
-  }
-  onOpen() {
-    const T = i18n().modal;
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.title });
-    for (const line of this.lines) {
-      contentEl.createEl("p", { text: line });
-    }
-    new import_obsidian3.Setting(contentEl).addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close())).addButton((b) => b.setButtonText(`\u25B6 ${T.run}`).setCta().onClick(() => {
-      this.close();
-      this.onConfirm();
-    }));
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var QueryModal = class extends import_obsidian3.Modal {
-  constructor(app, save, onSubmit) {
-    super(app);
-    this.save = save;
-    this.onSubmit = onSubmit;
-  }
-  question = "";
-  onOpen() {
-    const T = i18n().modal;
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.save ? T.queryAndSave : T.query });
-    const ta = contentEl.createEl("textarea", {
-      attr: { rows: "5", style: "width:100%;" },
-      placeholder: T.queryPlaceholder
-    });
-    ta.addEventListener("input", () => {
-      this.question = ta.value;
-    });
-    new import_obsidian3.Setting(contentEl).addButton(
-      (b) => b.setButtonText(`\u25B6 ${T.run}`).setCta().onClick(() => {
-        const q = this.question.trim();
-        if (!q)
-          return;
-        this.close();
-        this.onSubmit(q);
-      })
-    );
-    setTimeout(() => ta.focus(), 0);
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var DomainModal = class extends import_obsidian3.Modal {
-  constructor(app, title, allowAll, extra, domains, onSubmit) {
-    super(app);
-    this.title = title;
-    this.allowAll = allowAll;
-    this.extra = extra;
-    this.domains = domains;
-    this.onSubmit = onSubmit;
-  }
-  onOpen() {
-    const T = i18n().modal;
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.title });
-    let domain = this.allowAll ? "all" : this.domains[0]?.id ?? "";
-    let dryRun = false;
-    if (this.domains.length === 0) {
-      new import_obsidian3.Setting(contentEl).setName(T.domain_name).setDesc(T.noDomains_desc).addText((t) => t.setPlaceholder(T.domainIdPlaceholder).onChange((v) => {
-        domain = v.trim();
-      }));
-    } else {
-      new import_obsidian3.Setting(contentEl).setName(T.domain_name).addDropdown((d) => {
-        if (this.allowAll)
-          d.addOption("all", T.allWiki);
-        for (const entry of this.domains) {
-          d.addOption(entry.id, entry.name || entry.id);
-        }
-        d.setValue(domain);
-        d.onChange((v) => {
-          domain = v;
-        });
-      });
-    }
-    if (this.extra && "dryRun" in this.extra) {
-      new import_obsidian3.Setting(contentEl).setName(T.dryRun_name).addToggle((t) => t.onChange((v) => {
-        dryRun = v;
-      }));
-    }
-    new import_obsidian3.Setting(contentEl).addButton(
-      (b) => b.setButtonText(`\u25B6 ${T.run}`).setCta().onClick(() => {
-        this.close();
-        this.onSubmit(domain, { dryRun });
-      })
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-function defaultSourcePaths(wikiFolder) {
-  return wikiFolder ? [wikiFolder] : [];
-}
-var AddDomainModal = class extends import_obsidian3.Modal {
-  constructor(app, wikiRoot, onSubmit) {
-    super(app);
-    this.wikiRoot = wikiRoot;
-    this.onSubmit = onSubmit;
-  }
-  input = { id: "", name: "", wikiFolder: "", sourcePaths: [] };
-  wikiFolderInput = null;
-  sourcePathsInput = null;
-  sourcePathsTouched = false;
-  onOpen() {
-    const T = i18n().modal;
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: T.addDomain });
-    new import_obsidian3.Setting(contentEl).setName(T.id_name).setDesc(T.id_desc).addText(
-      (t) => t.setPlaceholder(T.idPlaceholder).onChange((v) => {
-        this.input.id = v.trim();
-        if (this.wikiFolderInput && !this.input.wikiFolder) {
-          const auto = `${this.wikiRoot}/${this.input.id}`;
-          this.wikiFolderInput.setValue(auto);
-          if (!this.sourcePathsTouched && this.sourcePathsInput) {
-            this.sourcePathsInput.setValue(auto);
-            this.input.sourcePaths = defaultSourcePaths(auto);
-          }
-        }
-      })
-    );
-    new import_obsidian3.Setting(contentEl).setName(T.displayName_name).addText((t) => t.setPlaceholder(T.idPlaceholder).onChange((v) => {
-      this.input.name = v.trim();
-    }));
-    new import_obsidian3.Setting(contentEl).setName(T.wikiFolder_name).setDesc(T.wikiFolder_desc(this.wikiRoot)).addText((t) => {
-      t.setPlaceholder(T.wikiFolder_placeholder(this.wikiRoot)).onChange((v) => {
-        this.input.wikiFolder = v.trim();
-        if (!this.sourcePathsTouched && this.sourcePathsInput) {
-          this.sourcePathsInput.setValue(v.trim());
-          this.input.sourcePaths = defaultSourcePaths(v.trim());
-        }
-      });
-      this.wikiFolderInput = t;
-    });
-    new import_obsidian3.Setting(contentEl).setName(T.sourcePaths_name).setDesc(T.sourcePaths_desc).addText((t) => {
-      t.setPlaceholder(T.sourcePaths_placeholder).onChange((v) => {
-        this.sourcePathsTouched = true;
-        this.input.sourcePaths = v.split(",").map((s) => s.trim()).filter(Boolean);
-      });
-      this.sourcePathsInput = t;
-    });
-    contentEl.createEl("p", { text: T.addDomainNote, cls: "muted" });
-    new import_obsidian3.Setting(contentEl).addButton(
-      (b) => b.setButtonText(T.add).setCta().onClick(() => {
-        if (!this.input.id)
-          return;
-        this.close();
-        this.onSubmit(this.input);
-      })
-    );
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-
-// src/view.ts
 var LLM_WIKI_VIEW_TYPE = "llm-wiki-view";
 var PREVIEW_INLINE = 140;
 var ASSISTANT_TEXT_MAX = 600;
@@ -1123,6 +1168,10 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.tickHandle = window.setInterval(() => this.updateMetrics(), 500);
   }
   appendEvent(ev) {
+    if (ev.kind === "domain_created") {
+      this.refreshDomains();
+      return;
+    }
     this.stepCount++;
     if (ev.kind === "tool_use") {
       this.toolCount++;
@@ -1418,12 +1467,20 @@ function translateSystemEvent(message) {
 
 // src/controller.ts
 var import_obsidian5 = require("obsidian");
-var import_node_fs2 = require("node:fs");
-var import_node_path5 = require("node:path");
-init_domain_map();
+var import_node_fs = require("node:fs");
+var import_node_path4 = require("node:path");
+
+// src/domain-map.ts
+function validateDomainId(id) {
+  if (!id)
+    return "ID \u0434\u043E\u043C\u0435\u043D\u0430 \u043F\u0443\u0441\u0442";
+  if (!/^[\p{L}\p{N}_-]+$/u.test(id))
+    return "ID \u0434\u043E\u043F\u0443\u0441\u043A\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0431\u0443\u043A\u0432\u044B/\u0446\u0438\u0444\u0440\u044B/_/-";
+  return null;
+}
 
 // src/phases/ingest.ts
-var import_node_path2 = require("node:path");
+var import_node_path = require("node:path");
 
 // src/phases/llm-utils.ts
 function extractStreamDeltas(chunk) {
@@ -1467,7 +1524,7 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
     yield { kind: "error", message: "ingest: file path required" };
     return;
   }
-  const absSource = (0, import_node_path2.isAbsolute)(filePath) ? filePath : (0, import_node_path2.join)(repoRoot, filePath);
+  const absSource = (0, import_node_path.isAbsolute)(filePath) ? filePath : (0, import_node_path.join)(repoRoot, filePath);
   const sourceVaultPath = vaultTools.toVaultPath(absSource);
   if (!sourceVaultPath) {
     yield { kind: "error", message: `Source file ${filePath} is outside the vault.` };
@@ -1487,7 +1544,7 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
     yield { kind: "error", message: "No domain found for this file. Configure domain-map." };
     return;
   }
-  const absWiki = (0, import_node_path2.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path2.join)(repoRoot, domain.wiki_folder);
+  const absWiki = (0, import_node_path.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path.join)(repoRoot, domain.wiki_folder);
   const wikiVaultPath = vaultTools.toVaultPath(absWiki);
   if (!wikiVaultPath) {
     yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
@@ -1565,7 +1622,7 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
 function detectDomain(absFilePath, domains, repoRoot) {
   for (const d of domains) {
     const matched = d.source_paths?.some((sp) => {
-      const abs = (0, import_node_path2.isAbsolute)(sp) ? sp : (0, import_node_path2.join)(repoRoot, sp);
+      const abs = (0, import_node_path.isAbsolute)(sp) ? sp : (0, import_node_path.join)(repoRoot, sp);
       return absFilePath.startsWith(abs);
     });
     if (matched)
@@ -1687,7 +1744,7 @@ ${indexContent.slice(0, 2e3)}` : ""
 }
 
 // src/phases/query.ts
-var import_node_path3 = require("node:path");
+var import_node_path2 = require("node:path");
 var MAX_CONTEXT_CHARS = 8e4;
 var META_FILES = ["_index.md", "_log.md", "_schema.md"];
 async function* runQuery(args, save, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
@@ -1701,7 +1758,7 @@ async function* runQuery(args, save, vaultTools, llm, model, domains, repoRoot, 
     yield { kind: "error", message: "No domain configured. Add a domain in settings." };
     return;
   }
-  const absWiki = (0, import_node_path3.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path3.join)(repoRoot, domain.wiki_folder);
+  const absWiki = (0, import_node_path2.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path2.join)(repoRoot, domain.wiki_folder);
   const wikiVaultPath = vaultTools.toVaultPath(absWiki);
   if (!wikiVaultPath) {
     yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
@@ -1824,7 +1881,7 @@ ${types}${notes}`;
 }
 
 // src/phases/lint.ts
-var import_node_path4 = require("node:path");
+var import_node_path3 = require("node:path");
 var META_FILES2 = ["_index.md", "_log.md", "_schema.md"];
 async function* runLint(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}) {
   const domainId = args[0];
@@ -1838,7 +1895,7 @@ async function* runLint(args, vaultTools, llm, model, domains, repoRoot, signal,
   for (const domain of targets) {
     if (signal.aborted)
       return;
-    const absWiki = (0, import_node_path4.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path4.join)(repoRoot, domain.wiki_folder);
+    const absWiki = (0, import_node_path3.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path3.join)(repoRoot, domain.wiki_folder);
     const wikiVaultPath = vaultTools.toVaultPath(absWiki);
     if (!wikiVaultPath) {
       reportParts.push(`## ${domain.id}
@@ -1935,7 +1992,7 @@ function buildEntityTypesBlock3(domain) {
 }
 
 // src/phases/init.ts
-async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultName, domainMapDir, signal, opts = {}) {
+async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultName, signal, opts = {}) {
   const domainId = args[0];
   const dryRun = args.includes("--dry-run");
   if (!domainId) {
@@ -2041,32 +2098,14 @@ ${JSON.stringify(entry, null, 2)}
     };
     return;
   }
-  const { domainMapPath: domainMapPath2, addDomain: addDomain2 } = await Promise.resolve().then(() => (init_domain_map(), domain_map_exports));
-  const dmPath = domainMapPath2(domainMapDir, vaultName);
-  yield { kind: "tool_use", name: "Write", input: { path: dmPath } };
-  try {
-    const result = addDomain2(domainMapDir, vaultName, repoRoot, {
-      id: entry.id,
-      name: entry.name ?? entry.id,
-      wikiFolder: entry.wiki_folder,
-      sourcePaths: entry.source_paths ?? []
-    });
-    if (!result.ok) {
-      yield { kind: "tool_result", ok: false, preview: result.error };
-      yield { kind: "error", message: result.error };
-      return;
-    }
-    yield { kind: "tool_result", ok: true };
-  } catch (e) {
-    yield { kind: "tool_result", ok: false, preview: e.message };
-    yield { kind: "error", message: e.message };
-    return;
-  }
+  yield { kind: "tool_use", name: "SaveDomain", input: { id: entry.id } };
+  yield { kind: "domain_created", entry };
+  yield { kind: "tool_result", ok: true };
   await appendLog2(vaultTools, wikiRootGuess, domainId);
   yield {
     kind: "result",
     durationMs: Date.now() - start,
-    text: `Domain "${domainId}" initialised. Edit domain-map to refine source_paths and entity_types.`
+    text: `Domain "${domainId}" initialised. Edit entity_types in plugin settings to refine extraction.`
   };
 }
 async function appendLog2(vaultTools, wikiRoot, domainId) {
@@ -2092,13 +2131,12 @@ async function tryRead3(vaultTools, path2) {
 
 // src/agent-runner.ts
 var AgentRunner = class {
-  constructor(llm, settings, vaultTools, vaultName, domains, domainMapDir = "") {
+  constructor(llm, settings, vaultTools, vaultName, domains) {
     this.llm = llm;
     this.settings = settings;
     this.vaultTools = vaultTools;
     this.vaultName = vaultName;
     this.domains = domains;
-    this.domainMapDir = domainMapDir;
   }
   buildOptsFor(op) {
     const key = op === "query-save" ? "query" : op;
@@ -2138,7 +2176,7 @@ var AgentRunner = class {
         yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
       case "init":
-        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, this.domainMapDir, req.signal, opts);
+        yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
         break;
       default: {
         const start = Date.now();
@@ -9624,31 +9662,45 @@ var WikiController = class {
     const args = dryRun ? [domain, "--dry-run"] : [domain];
     await this.dispatch("init", args);
   }
-  resolveDomainMapDir() {
-    const s = this.plugin.settings;
-    if (s.domainMapDir)
-      return s.domainMapDir;
-    const base = this.app.vault.adapter.getBasePath?.() ?? "";
-    return (0, import_node_path5.join)(base, this.app.vault.configDir, "plugins", "obsidian-llm-wiki");
-  }
   cwdOrEmpty() {
     return this.app.vault.adapter.getBasePath?.() ?? "";
   }
   loadDomains() {
-    return readDomains(this.resolveDomainMapDir(), this.app.vault.getName());
+    return this.plugin.settings.domains ?? [];
   }
   registerDomain(input) {
-    const vaultBase = this.app.vault.adapter.getBasePath?.() ?? "";
-    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), vaultBase, input);
-    if (r.ok)
-      new import_obsidian5.Notice(i18n().ctrl.domainAdded(input.id));
-    else
-      new import_obsidian5.Notice(i18n().ctrl.domainAddFailed(r.error));
-    return r;
+    const id = input.id.trim();
+    const err = validateDomainId(id);
+    if (err) {
+      new import_obsidian5.Notice(i18n().ctrl.domainAddFailed(err));
+      return { ok: false, error: err };
+    }
+    const s = this.plugin.settings;
+    if (!s.domains)
+      s.domains = [];
+    if (s.domains.some((d) => d.id === id)) {
+      const msg = `\u0414\u043E\u043C\u0435\u043D \xAB${id}\xBB \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442`;
+      new import_obsidian5.Notice(i18n().ctrl.domainAddFailed(msg));
+      return { ok: false, error: msg };
+    }
+    const vaultName = this.app.vault.getName();
+    const wikiRoot = `vaults/${vaultName}/!Wiki`;
+    const wikiFolder = input.wikiFolder.trim() || `${wikiRoot}/${id}`;
+    s.domains.push({
+      id,
+      name: input.name.trim() || id,
+      wiki_folder: wikiFolder,
+      source_paths: input.sourcePaths.map((p) => p.trim()).filter(Boolean),
+      entity_types: [],
+      language_notes: ""
+    });
+    void this.plugin.saveSettings();
+    new import_obsidian5.Notice(i18n().ctrl.domainAdded(id));
+    return { ok: true };
   }
   requireClaudeAgent() {
     const p = this.plugin.settings.claudeAgent.iclaudePath;
-    if (!p || !(0, import_node_fs2.existsSync)(p)) {
+    if (!p || !(0, import_node_fs.existsSync)(p)) {
       new import_obsidian5.Notice(i18n().ctrl.setClaudeCodePath);
       return null;
     }
@@ -9659,8 +9711,7 @@ var WikiController = class {
     const base = this.app.vault.adapter.getBasePath?.() ?? "";
     const vaultTools = new VaultTools(adapter, base);
     const vaultName = this.app.vault.getName();
-    const domainMapDir = this.resolveDomainMapDir();
-    const domains = readDomains(domainMapDir, vaultName);
+    const domains = this.plugin.settings.domains ?? [];
     const s = this.plugin.settings;
     const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
     const llm = s.backend === "claude-agent" ? new ClaudeCliClient({ ...s.claudeAgent, maxTokens: s.maxTokens, requestTimeoutSec: maxTimeoutSec }) : new OpenAI({
@@ -9669,19 +9720,19 @@ var WikiController = class {
       timeout: maxTimeoutSec * 1e3,
       dangerouslyAllowBrowser: true
     });
-    return new AgentRunner(llm, s, vaultTools, vaultName, domains, domainMapDir);
+    return new AgentRunner(llm, s, vaultTools, vaultName, domains);
   }
   logEvent(sessionId, op, domainId, ev) {
     let logPath = this.plugin.settings.agentLogPath;
     if (!logPath)
       return;
     try {
-      const stat = (0, import_node_fs2.existsSync)(logPath) ? (0, import_node_fs2.statSync)(logPath) : null;
+      const stat = (0, import_node_fs.existsSync)(logPath) ? (0, import_node_fs.statSync)(logPath) : null;
       if (stat?.isDirectory() || !logPath.includes(".") && !logPath.endsWith("/")) {
-        logPath = (0, import_node_path5.join)(logPath, "agent.jsonl");
+        logPath = (0, import_node_path4.join)(logPath, "agent.jsonl");
       }
       const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), session: sessionId, op, domainId, event: ev }) + "\n";
-      (0, import_node_fs2.appendFileSync)(logPath, line, "utf-8");
+      (0, import_node_fs.appendFileSync)(logPath, line, "utf-8");
     } catch {
     }
   }
@@ -9716,6 +9767,12 @@ var WikiController = class {
       for await (const ev of runGen) {
         this.logEvent(sessionId, op, domainId, ev);
         view.appendEvent(ev);
+        if (ev.kind === "domain_created") {
+          if (!this.plugin.settings.domains)
+            this.plugin.settings.domains = [];
+          this.plugin.settings.domains.push(ev.entry);
+          void this.plugin.saveSettings();
+        }
         this.collectStep(ev, steps);
         if (ev.kind === "result")
           finalText = ev.text;
@@ -9785,9 +9842,9 @@ var WikiController = class {
     return view instanceof LlmWikiView ? view : null;
   }
   toVaultPath(vaultDir, savedPath) {
-    const abs = (0, import_node_path5.isAbsolute)(savedPath) ? savedPath : (0, import_node_path5.join)(vaultDir, savedPath);
-    const rel = (0, import_node_path5.relative)(vaultDir, abs);
-    if (rel.startsWith("..") || (0, import_node_path5.isAbsolute)(rel))
+    const abs = (0, import_node_path4.isAbsolute)(savedPath) ? savedPath : (0, import_node_path4.join)(vaultDir, savedPath);
+    const rel = (0, import_node_path4.relative)(vaultDir, abs);
+    if (rel.startsWith("..") || (0, import_node_path4.isAbsolute)(rel))
       return null;
     return rel;
   }
@@ -9910,12 +9967,11 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
           init: { ...defNA.operations.init, ...naOps.init ?? {} }
         }
       },
-      history: data?.history ?? []
+      history: data?.history ?? [],
+      domains: Array.isArray(data?.domains) ? data.domains : []
     };
     if (!data?.systemPrompt && (caData.systemPrompt || naData.systemPrompt))
       this.settings.systemPrompt = caData.systemPrompt ?? naData.systemPrompt;
-    if (!data?.domainMapDir && (caData.domainMapDir || naData.domainMapDir))
-      this.settings.domainMapDir = caData.domainMapDir ?? naData.domainMapDir;
     if (!data?.maxTokens && (caData.maxTokens || naData.maxTokens))
       this.settings.maxTokens = caData.maxTokens ?? naData.maxTokens;
     if (data?.backend === "claude-code") {
