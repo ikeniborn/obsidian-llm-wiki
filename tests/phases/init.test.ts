@@ -47,7 +47,7 @@ const validDomainJson = JSON.stringify({
   name: "New Domain",
   wiki_folder: "vaults/TestVault/!Wiki/newdomain",
   source_paths: [],
-  entity_types: ["Type1"],
+  entity_types: [],
   language_notes: "",
 });
 
@@ -55,7 +55,7 @@ describe("runInit", () => {
   it("yields error when domainId is empty", async () => {
     const vt = new VaultTools(mockAdapter(), "/vault");
     const events = await collect(
-      runInit([], vt, makeLlm("{}"), "model", [], "/vault", "TestVault", "/domainMapDir", new AbortController().signal),
+      runInit([], vt, makeLlm("{}"), "model", [], "/vault", "TestVault", new AbortController().signal),
     );
     expect(events.some((e: any) => e.kind === "error")).toBe(true);
   });
@@ -71,14 +71,13 @@ describe("runInit", () => {
         [existingDomain],
         "/vault",
         "TestVault",
-        "/domainMapDir",
         new AbortController().signal,
       ),
     );
     expect(events.some((e: any) => e.kind === "error")).toBe(true);
   });
 
-  it("dry-run returns JSON preview without writing", async () => {
+  it("dry-run returns JSON preview without domain_created event", async () => {
     const adapter = mockAdapter({
       list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
     });
@@ -92,13 +91,57 @@ describe("runInit", () => {
         [],
         "/vault",
         "TestVault",
-        "/domainMapDir",
         new AbortController().signal,
       ),
     );
     const result = events.find((e: any) => e.kind === "result") as any;
     expect(result).toBeDefined();
     expect(result.text).toContain("Dry run");
-    expect(adapter.write).not.toHaveBeenCalled();
+    expect(events.some((e: any) => e.kind === "domain_created")).toBe(false);
+  });
+
+  it("yields domain_created event with parsed entry on success", async () => {
+    const adapter = mockAdapter({
+      list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+    });
+    const vt = new VaultTools(adapter, "/vault");
+    const events = await collect(
+      runInit(
+        ["newdomain"],
+        vt,
+        makeLlm(validDomainJson),
+        "model",
+        [],
+        "/vault",
+        "TestVault",
+        new AbortController().signal,
+      ),
+    );
+    const domainCreated = events.find((e: any) => e.kind === "domain_created") as any;
+    expect(domainCreated).toBeDefined();
+    expect(domainCreated.entry.id).toBe("newdomain");
+    expect(domainCreated.entry.wiki_folder).toBe("vaults/TestVault/!Wiki/newdomain");
+  });
+
+  it("yields result event after domain_created", async () => {
+    const adapter = mockAdapter({
+      list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+    });
+    const vt = new VaultTools(adapter, "/vault");
+    const events = await collect(
+      runInit(
+        ["newdomain"],
+        vt,
+        makeLlm(validDomainJson),
+        "model",
+        [],
+        "/vault",
+        "TestVault",
+        new AbortController().signal,
+      ),
+    );
+    const result = events.find((e: any) => e.kind === "result") as any;
+    expect(result).toBeDefined();
+    expect(result.text).toContain("newdomain");
   });
 });
