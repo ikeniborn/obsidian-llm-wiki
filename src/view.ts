@@ -227,6 +227,10 @@ export class LlmWikiView extends ItemView {
   }
 
   appendEvent(ev: RunEvent): void {
+    if (ev.kind === "domain_created") {
+      this.refreshDomains();
+      return;
+    }
     this.stepCount++;
     if (ev.kind === "tool_use") {
       this.toolCount++;
