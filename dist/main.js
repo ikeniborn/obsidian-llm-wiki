@@ -33,7 +33,7 @@ var DEFAULT_SETTINGS = {
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 600, init: 3600, fix: 300 },
+  timeouts: { ingest: 300, query: 300, lint: 900, init: 3600 },
   history: [],
   claudeAgent: {
     iclaudePath: "",
@@ -42,9 +42,8 @@ var DEFAULT_SETTINGS = {
     operations: {
       ingest: { model: "haiku", maxTokens: 4096 },
       query: { model: "sonnet", maxTokens: 4096 },
-      lint: { model: "haiku", maxTokens: 4096 },
-      init: { model: "sonnet", maxTokens: 8192 },
-      fix: { model: "sonnet", maxTokens: 8192 }
+      lint: { model: "sonnet", maxTokens: 8192 },
+      init: { model: "sonnet", maxTokens: 8192 }
     }
   },
   nativeAgent: {
@@ -58,9 +57,8 @@ var DEFAULT_SETTINGS = {
     operations: {
       ingest: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
       query: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
-      lint: { model: "llama3.2", maxTokens: 4096, temperature: 0.2 },
-      init: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
-      fix: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 }
+      lint: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 },
+      init: { model: "llama3.2", maxTokens: 8192, temperature: 0.2 }
     }
   }
 };
@@ -118,7 +116,6 @@ var en = {
     op_query: "Query",
     op_lint: "Lint",
     op_init: "Init",
-    op_fix: "Fix",
     opModel_name: "Model",
     opModel_desc: "Model name for this operation.",
     opMaxTokens_name: "Max tokens",
@@ -131,7 +128,6 @@ var en = {
     addDomain: "Add domain",
     ingest: "Ingest",
     lint: "Lint",
-    fix: "Fix",
     init: "Init",
     ask: "Ask",
     askAndSave: "Ask and save",
@@ -165,7 +161,6 @@ var en = {
     query: "Query",
     querySave: "Query and save as page",
     lint: "Lint domain",
-    fix: "Fix domain wiki",
     init: "Init domain",
     cancel: "Cancel operation"
   },
@@ -186,11 +181,8 @@ var en = {
     idPlaceholder: "e.g.: projects",
     displayName_name: "Display name",
     wikiFolder_name: "Wiki folder",
-    wikiFolder_desc: (root) => `Path relative to cwd. Empty = ${root}/<id>.`,
+    wikiFolder_desc: (root) => `Vault-relative path. Empty = ${root}/<id>. Source paths are populated automatically during ingest.`,
     wikiFolder_placeholder: (root) => `${root}/<id>`,
-    sourcePaths_name: "Source paths",
-    sourcePaths_desc: "Comma-separated list. Defaults to wiki folder.",
-    sourcePaths_placeholder: "vaults/Work/Projects/",
     addDomainNote: "The entry will be saved in plugin settings with empty entity_types. Edit the domain in Settings \u2192 Domains to add entity_types/extraction_cues.",
     add: "Add",
     editDomainTitle: (id) => `Edit domain: ${id}`,
@@ -198,12 +190,7 @@ var en = {
     entityTypesError: "Invalid JSON array \u2014 must be an array of objects",
     sourcePathsLabel: "Source paths (one per line)",
     languageNotesLabel: "Language notes",
-    save: "Save",
-    fixFromLintTitle: (id) => `Fix wiki \u2014 domain "${id}"`,
-    fixFromLintDesc: "Select a lint report to guide the fix:",
-    fixUseLint: "Fix with this report",
-    fixWithoutLint: "Fix without lint report",
-    fixWithoutLintDesc: "Apply only structural fixes (dead links, missing frontmatter)."
+    save: "Save"
   }
 };
 var ru = {
@@ -251,7 +238,6 @@ var ru = {
     op_query: "Query",
     op_lint: "Lint",
     op_init: "Init",
-    op_fix: "Fix",
     opModel_name: "\u041C\u043E\u0434\u0435\u043B\u044C",
     opModel_desc: "\u0418\u043C\u044F \u043C\u043E\u0434\u0435\u043B\u0438 \u0434\u043B\u044F \u044D\u0442\u043E\u0439 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438.",
     opMaxTokens_name: "Max tokens",
@@ -264,7 +250,6 @@ var ru = {
     addDomain: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D",
     ingest: "Ingest",
     lint: "Lint",
-    fix: "Fix",
     init: "Init",
     ask: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C",
     askAndSave: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
@@ -298,7 +283,6 @@ var ru = {
     query: "\u0417\u0430\u043F\u0440\u043E\u0441",
     querySave: "\u0417\u0430\u043F\u0440\u043E\u0441 \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043A\u0430\u043A \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443",
     lint: "Lint \u0434\u043E\u043C\u0435\u043D\u0430",
-    fix: "Fix wiki \u0434\u043E\u043C\u0435\u043D\u0430",
     init: "Init \u0434\u043E\u043C\u0435\u043D\u0430",
     cancel: "\u041E\u0442\u043C\u0435\u043D\u0430 \u043E\u043F\u0435\u0440\u0430\u0446\u0438\u0438"
   },
@@ -319,11 +303,8 @@ var ru = {
     idPlaceholder: "\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440: \u043F\u0440\u043E\u0435\u043A\u0442\u044B",
     displayName_name: "\u041E\u0442\u043E\u0431\u0440\u0430\u0436\u0430\u0435\u043C\u043E\u0435 \u0438\u043C\u044F",
     wikiFolder_name: "Wiki folder",
-    wikiFolder_desc: (root) => `\u041F\u0443\u0442\u044C \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0435\u043B\u044C\u043D\u043E cwd. \u041F\u0443\u0441\u0442\u043E = ${root}/<id>.`,
+    wikiFolder_desc: (root) => `\u041F\u0443\u0442\u044C \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0435\u043B\u044C\u043D\u043E \u043A\u043E\u0440\u043D\u044F \u0432\u043E\u043B\u0442\u0430. \u041F\u0443\u0441\u0442\u043E = ${root}/<id>. \u041F\u0443\u0442\u0438 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u043E\u0432 \u0437\u0430\u043F\u043E\u043B\u043D\u044F\u044E\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438 \u043F\u0440\u0438 ingest.`,
     wikiFolder_placeholder: (root) => `${root}/<id>`,
-    sourcePaths_name: "Source paths",
-    sourcePaths_desc: "\u0421\u043F\u0438\u0441\u043E\u043A \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E. \u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442 \u0441 wiki folder.",
-    sourcePaths_placeholder: "vaults/Work/\u041F\u0440\u043E\u0435\u043A\u0442\u044B/",
     addDomainNote: "\u0417\u0430\u043F\u0438\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u0441\u044F \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u043F\u043B\u0430\u0433\u0438\u043D\u0430 \u0441 \u043F\u0443\u0441\u0442\u044B\u043C\u0438 entity_types. \u041E\u0442\u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0434\u043E\u043C\u0435\u043D \u0432 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u2192 \u0414\u043E\u043C\u0435\u043D\u044B \u0434\u043B\u044F \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u0438\u044F entity_types/extraction_cues.",
     add: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C",
     editDomainTitle: (id) => `\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0434\u043E\u043C\u0435\u043D\u0430: ${id}`,
@@ -331,12 +312,7 @@ var ru = {
     entityTypesError: "\u041D\u0435\u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u2014 \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C \u043C\u0430\u0441\u0441\u0438\u0432\u043E\u043C \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432",
     sourcePathsLabel: "\u041F\u0443\u0442\u0438 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A\u043E\u0432 (\u043F\u043E \u043E\u0434\u043D\u043E\u043C\u0443 \u043D\u0430 \u0441\u0442\u0440\u043E\u043A\u0443)",
     languageNotesLabel: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438 \u043E \u044F\u0437\u044B\u043A\u0435",
-    save: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
-    fixFromLintTitle: (id) => `Fix wiki \u2014 \u0434\u043E\u043C\u0435\u043D \xAB${id}\xBB`,
-    fixFromLintDesc: "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0442\u0447\u0451\u0442 lint \u0434\u043B\u044F \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F:",
-    fixUseLint: "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u043E \u044D\u0442\u043E\u043C\u0443 \u043E\u0442\u0447\u0451\u0442\u0443",
-    fixWithoutLint: "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437 \u043E\u0442\u0447\u0451\u0442\u0430 lint",
-    fixWithoutLintDesc: "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u043E\u043B\u044C\u043A\u043E \u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F (\u043C\u0451\u0440\u0442\u0432\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438, frontmatter)."
+    save: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C"
   }
 };
 var es = {
@@ -384,7 +360,6 @@ var es = {
     op_query: "Query",
     op_lint: "Lint",
     op_init: "Init",
-    op_fix: "Fix",
     opModel_name: "Modelo",
     opModel_desc: "Nombre del modelo para esta operaci\xF3n.",
     opMaxTokens_name: "M\xE1x. tokens",
@@ -397,7 +372,6 @@ var es = {
     addDomain: "A\xF1adir dominio",
     ingest: "Ingest",
     lint: "Lint",
-    fix: "Fix",
     init: "Init",
     ask: "Preguntar",
     askAndSave: "Preguntar y guardar",
@@ -431,7 +405,6 @@ var es = {
     query: "Consulta",
     querySave: "Consulta y guardar como p\xE1gina",
     lint: "Lint del dominio",
-    fix: "Fix wiki del dominio",
     init: "Init del dominio",
     cancel: "Cancelar operaci\xF3n"
   },
@@ -452,11 +425,8 @@ var es = {
     idPlaceholder: "ej.: proyectos",
     displayName_name: "Nombre para mostrar",
     wikiFolder_name: "Carpeta wiki",
-    wikiFolder_desc: (root) => `Ruta relativa al cwd. Vac\xEDo = ${root}/<id>.`,
+    wikiFolder_desc: (root) => `Ruta relativa a la ra\xEDz del vault. Vac\xEDo = ${root}/<id>. Las rutas de fuentes se rellenan autom\xE1ticamente en ingest.`,
     wikiFolder_placeholder: (root) => `${root}/<id>`,
-    sourcePaths_name: "Rutas de fuentes",
-    sourcePaths_desc: "Lista separada por comas. Por defecto coincide con la carpeta wiki.",
-    sourcePaths_placeholder: "vaults/Work/Proyectos/",
     addDomainNote: "La entrada se guardar\xE1 en la configuraci\xF3n del plugin con entity_types vac\xEDos. Edita el dominio en Ajustes \u2192 Dominios para a\xF1adir entity_types/extraction_cues.",
     add: "A\xF1adir",
     editDomainTitle: (id) => `Editar dominio: ${id}`,
@@ -464,12 +434,7 @@ var es = {
     entityTypesError: "Array JSON inv\xE1lido \u2014 debe ser un array de objetos",
     sourcePathsLabel: "Rutas de origen (una por l\xEDnea)",
     languageNotesLabel: "Notas de idioma",
-    save: "Guardar",
-    fixFromLintTitle: (id) => `Fix wiki \u2014 dominio "${id}"`,
-    fixFromLintDesc: "Selecciona un informe lint para guiar la correcci\xF3n:",
-    fixUseLint: "Corregir con este informe",
-    fixWithoutLint: "Corregir sin informe lint",
-    fixWithoutLintDesc: "Aplicar solo correcciones estructurales (enlaces muertos, frontmatter)."
+    save: "Guardar"
   }
 };
 var locales = { ru, es };
@@ -514,7 +479,8 @@ var QueryModal = class extends import_obsidian2.Modal {
     const { contentEl } = this;
     contentEl.createEl("h3", { text: this.save ? T.queryAndSave : T.query });
     const ta = contentEl.createEl("textarea", {
-      attr: { rows: "5", style: "width:100%;" },
+      cls: "llm-wiki-modal-input",
+      attr: { rows: "5" },
       placeholder: T.queryPlaceholder
     });
     ta.addEventListener("input", () => {
@@ -583,19 +549,14 @@ var DomainModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
-function defaultSourcePaths(wikiFolder) {
-  return wikiFolder ? [wikiFolder] : [];
-}
 var AddDomainModal = class extends import_obsidian2.Modal {
   constructor(app, wikiRoot, onSubmit) {
     super(app);
     this.wikiRoot = wikiRoot;
     this.onSubmit = onSubmit;
   }
-  input = { id: "", name: "", wikiFolder: "", sourcePaths: [] };
+  input = { id: "", name: "", wikiFolder: "" };
   wikiFolderInput = null;
-  sourcePathsInput = null;
-  sourcePathsTouched = false;
   onOpen() {
     const T = i18n().modal;
     const { contentEl } = this;
@@ -604,12 +565,7 @@ var AddDomainModal = class extends import_obsidian2.Modal {
       (t) => t.setPlaceholder(T.idPlaceholder).onChange((v) => {
         this.input.id = v.trim();
         if (this.wikiFolderInput && !this.input.wikiFolder) {
-          const auto = `${this.wikiRoot}/${this.input.id}`;
-          this.wikiFolderInput.setValue(auto);
-          if (!this.sourcePathsTouched && this.sourcePathsInput) {
-            this.sourcePathsInput.setValue(auto);
-            this.input.sourcePaths = defaultSourcePaths(auto);
-          }
+          this.wikiFolderInput.setValue(`${this.wikiRoot}/${this.input.id}`);
         }
       })
     );
@@ -619,19 +575,8 @@ var AddDomainModal = class extends import_obsidian2.Modal {
     new import_obsidian2.Setting(contentEl).setName(T.wikiFolder_name).setDesc(T.wikiFolder_desc(this.wikiRoot)).addText((t) => {
       t.setPlaceholder(T.wikiFolder_placeholder(this.wikiRoot)).onChange((v) => {
         this.input.wikiFolder = v.trim();
-        if (!this.sourcePathsTouched && this.sourcePathsInput) {
-          this.sourcePathsInput.setValue(v.trim());
-          this.input.sourcePaths = defaultSourcePaths(v.trim());
-        }
       });
       this.wikiFolderInput = t;
-    });
-    new import_obsidian2.Setting(contentEl).setName(T.sourcePaths_name).setDesc(T.sourcePaths_desc).addText((t) => {
-      t.setPlaceholder(T.sourcePaths_placeholder).onChange((v) => {
-        this.sourcePathsTouched = true;
-        this.input.sourcePaths = v.split(",").map((s) => s.trim()).filter(Boolean);
-      });
-      this.sourcePathsInput = t;
     });
     contentEl.createEl("p", { text: T.addDomainNote, cls: "muted" });
     new import_obsidian2.Setting(contentEl).addButton(
@@ -674,17 +619,17 @@ var EditDomainModal = class extends import_obsidian2.Modal {
     new import_obsidian2.Setting(contentEl).setName(T.wikiFolder_name).addText((t) => t.setValue(this.wikiFolderVal).onChange((v) => {
       this.wikiFolderVal = v;
     }));
-    new import_obsidian2.Setting(contentEl).setName(T.sourcePathsLabel).setDesc(T.sourcePaths_desc).addTextArea((t) => {
+    new import_obsidian2.Setting(contentEl).setName(T.sourcePathsLabel).addTextArea((t) => {
       t.inputEl.rows = 4;
-      t.inputEl.style.width = "100%";
+      t.inputEl.addClass("llm-wiki-settings-textarea");
       t.setValue(this.sourcePathsVal).onChange((v) => {
         this.sourcePathsVal = v;
       });
     });
     new import_obsidian2.Setting(contentEl).setName(T.entityTypesLabel).addTextArea((t) => {
       t.inputEl.rows = 10;
-      t.inputEl.style.width = "100%";
-      t.inputEl.style.fontFamily = "monospace";
+      t.inputEl.addClass("llm-wiki-settings-textarea");
+      t.inputEl.addClass("llm-wiki-monospace");
       t.setValue(this.entityTypesVal).onChange((v) => {
         this.entityTypesVal = v;
       });
@@ -692,13 +637,11 @@ var EditDomainModal = class extends import_obsidian2.Modal {
     new import_obsidian2.Setting(contentEl).setName(T.languageNotesLabel).addText((t) => t.setValue(this.languageNotesVal).onChange((v) => {
       this.languageNotesVal = v;
     }));
-    this.errorEl = contentEl.createEl("p", { cls: "mod-warning" });
-    this.errorEl.style.display = "none";
+    this.errorEl = contentEl.createEl("p", { cls: "mod-warning llm-wiki-hidden" });
     new import_obsidian2.Setting(contentEl).addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close())).addButton((b) => b.setButtonText(T.save).setCta().onClick(() => this.handleSave()));
   }
   handleSave() {
-    if (this.errorEl)
-      this.errorEl.style.display = "none";
+    this.errorEl?.addClass("llm-wiki-hidden");
     let entityTypes;
     try {
       const parsed = JSON.parse(this.entityTypesVal.trim() || "[]");
@@ -711,7 +654,7 @@ var EditDomainModal = class extends import_obsidian2.Modal {
     } catch {
       if (this.errorEl) {
         this.errorEl.textContent = i18n().modal.entityTypesError;
-        this.errorEl.style.display = "";
+        this.errorEl.removeClass("llm-wiki-hidden");
       }
       return;
     }
@@ -725,39 +668,6 @@ var EditDomainModal = class extends import_obsidian2.Modal {
     };
     this.close();
     this.onSave(updated);
-  }
-  onClose() {
-    this.contentEl.empty();
-  }
-};
-var FixFromLintModal = class extends import_obsidian2.Modal {
-  constructor(app, domainId, lintEntries, onRun) {
-    super(app);
-    this.domainId = domainId;
-    this.lintEntries = lintEntries;
-    this.onRun = onRun;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    const T = i18n().modal;
-    contentEl.createEl("h3", { text: T.fixFromLintTitle(this.domainId) });
-    if (this.lintEntries.length > 0) {
-      contentEl.createEl("p", { text: T.fixFromLintDesc, cls: "muted" });
-      for (const entry of this.lintEntries) {
-        const date = new Date(entry.startedAt).toLocaleString();
-        const preview = entry.finalText.slice(0, 120).replace(/\n+/g, " ");
-        new import_obsidian2.Setting(contentEl).setName(date).setDesc(preview + (entry.finalText.length > 120 ? "\u2026" : "")).addButton((b) => b.setButtonText(T.fixUseLint).setCta().onClick(() => {
-          this.close();
-          this.onRun(entry.finalText);
-        }));
-      }
-      contentEl.createEl("hr");
-    }
-    new import_obsidian2.Setting(contentEl).setName(T.fixWithoutLint).setDesc(T.fixWithoutLintDesc).addButton((b) => b.setButtonText(T.run).onClick(() => {
-      this.close();
-      this.onRun(void 0);
-    }));
-    new import_obsidian2.Setting(contentEl).addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close()));
   }
   onClose() {
     this.contentEl.empty();
@@ -832,20 +742,24 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
         const d = domains[i];
         new import_obsidian3.Setting(containerEl).setName(d.name || d.id).setDesc(d.id).addButton(
           (b) => b.setButtonText(T.settings.editDomain).onClick(() => {
-            new EditDomainModal(this.plugin.app, d, async (updated) => {
-              s.domains[i] = updated;
-              await this.plugin.saveSettings();
-              this.display();
+            new EditDomainModal(this.plugin.app, d, (updated) => {
+              void (async () => {
+                s.domains[i] = updated;
+                await this.plugin.saveSettings();
+                this.display();
+              })();
             }).open();
           })
         ).addButton(
-          (b) => b.setButtonText(T.settings.deleteDomain).setWarning().onClick(async () => {
-            if (!confirm(T.settings.confirmDeleteDomain(d.id)))
-              return;
-            new import_obsidian3.Notice(T.settings.domainDeleted(d.id));
-            s.domains.splice(i, 1);
-            await this.plugin.saveSettings();
-            this.display();
+          (b) => b.setButtonText(T.settings.deleteDomain).setWarning().onClick(() => {
+            new ConfirmModal(this.plugin.app, T.settings.confirmDeleteDomain(d.id), [], () => {
+              void (async () => {
+                new import_obsidian3.Notice(T.settings.domainDeleted(d.id));
+                s.domains.splice(i, 1);
+                await this.plugin.saveSettings();
+                this.display();
+              })();
+            }).open();
           })
         );
       }
@@ -867,10 +781,13 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
       );
       if (!s.claudeAgent.perOperation) {
         new import_obsidian3.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_claude).addText(
-          (t) => t.setPlaceholder("sonnet").setValue(s.claudeAgent.model).onChange(async (v) => {
-            s.claudeAgent.model = v.trim();
-            await this.plugin.saveSettings();
-          })
+          (t) => (
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            t.setPlaceholder("sonnet").setValue(s.claudeAgent.model).onChange(async (v) => {
+              s.claudeAgent.model = v.trim();
+              await this.plugin.saveSettings();
+            })
+          )
         );
       }
       new import_obsidian3.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
@@ -908,23 +825,32 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
       }
     } else {
       new import_obsidian3.Setting(containerEl).setName(T.settings.baseUrl_name).setDesc(T.settings.baseUrl_desc).addText(
-        (t) => t.setPlaceholder("http://localhost:11434/v1").setValue(s.nativeAgent.baseUrl).onChange(async (v) => {
-          s.nativeAgent.baseUrl = v.trim();
-          await this.plugin.saveSettings();
-        })
+        (t) => (
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          t.setPlaceholder("http://localhost:11434/v1").setValue(s.nativeAgent.baseUrl).onChange(async (v) => {
+            s.nativeAgent.baseUrl = v.trim();
+            await this.plugin.saveSettings();
+          })
+        )
       );
       new import_obsidian3.Setting(containerEl).setName(T.settings.apiKey_name).setDesc(T.settings.apiKey_desc).addText(
-        (t) => t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
-          s.nativeAgent.apiKey = v.trim();
-          await this.plugin.saveSettings();
-        })
+        (t) => (
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
+          t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
+            s.nativeAgent.apiKey = v.trim();
+            await this.plugin.saveSettings();
+          })
+        )
       );
       if (!s.nativeAgent.perOperation) {
         new import_obsidian3.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_native).addText(
-          (t) => t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
-            s.nativeAgent.model = v.trim();
-            await this.plugin.saveSettings();
-          })
+          (t) => (
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
+            t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
+              s.nativeAgent.model = v.trim();
+              await this.plugin.saveSettings();
+            })
+          )
         );
         new import_obsidian3.Setting(containerEl).setName(T.settings.numCtx_name).setDesc(T.settings.numCtx_desc).addText(
           (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
@@ -1027,7 +953,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
   initBtn;
   ingestBtn;
   lintBtn;
-  fixBtn;
   startTs = 0;
   toolCount = 0;
   stepCount = 0;
@@ -1042,7 +967,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     return LLM_WIKI_VIEW_TYPE;
   }
   getDisplayText() {
-    return "LLM wiki";
+    return "LLM Wiki";
   }
   getIcon() {
     return "brain-circuit";
@@ -1052,7 +977,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     root.empty();
     root.addClass("llm-wiki-view");
     const header = root.createDiv("llm-wiki-header");
-    header.createEl("h3", { text: "LLM wiki" });
+    header.createEl("h3", { text: "LLM Wiki" });
     this.statusEl = header.createDiv("llm-wiki-status");
     const domainBox = root.createDiv("llm-wiki-domain");
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
@@ -1067,7 +992,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.initBtn = actionRow.createEl("button", { text: T.view.init });
     this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
     this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
-    this.fixBtn = actionRow.createEl("button", { text: T.view.fix });
     this.domainSelect.addEventListener("change", () => this.updateInitBtn());
     this.initBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
@@ -1099,22 +1023,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
         `Domain: ${domainLabel}`,
         "Claude will check wiki pages for quality and update entity_types."
       ], () => void this.plugin.controller.lint(d || "all")).open();
-    });
-    this.fixBtn.addEventListener("click", () => {
-      const d = this.domainSelect.value;
-      if (!d) {
-        new import_obsidian4.Notice(i18n().view.selectDomainForInit);
-        return;
-      }
-      const lintEntries = this.plugin.settings.history.filter(
-        (h) => h.operation === "lint" && (h.args.length === 0 || h.args.includes(d)) && h.finalText
-      );
-      new FixFromLintModal(
-        this.plugin.app,
-        d,
-        lintEntries,
-        (lintReport) => void this.plugin.controller.fix(d, lintReport)
-      ).open();
     });
     this.refreshDomains();
     const ask = root.createDiv("llm-wiki-ask");
@@ -1192,8 +1100,11 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     }
     const domains = this.plugin.controller.loadDomains();
     const wikiRoot = (() => {
-      const sample = domains[0]?.wiki_folder ?? "vaults/Work/!Wiki/x";
-      return sample.replace(/\/[^/]+$/, "") || "vaults/Work/!Wiki";
+      const vaultName = this.plugin.app.vault.getName();
+      const vaultPrefix = `vaults/${vaultName}/`;
+      const sample = domains[0]?.wiki_folder ?? `${vaultPrefix}!Wiki/x`;
+      const rel = sample.startsWith(vaultPrefix) ? sample.slice(vaultPrefix.length) : sample;
+      return rel.replace(/\/[^/]+$/, "") || "!Wiki";
     })();
     new AddDomainModal(this.app, wikiRoot, (input) => {
       const r = this.plugin.controller.registerDomain(input);
@@ -1227,7 +1138,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.initBtn.disabled = true;
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
-    this.fixBtn.disabled = true;
     this.resultSection.addClass("llm-wiki-hidden");
     this.finalEl.empty();
     this.resultOpen = false;
@@ -1343,7 +1253,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.askSaveBtn.disabled = false;
     this.ingestBtn.disabled = false;
     this.lintBtn.disabled = false;
-    this.fixBtn.disabled = false;
     this.updateInitBtn();
     if (this.tickHandle !== null) {
       window.clearInterval(this.tickHandle);
@@ -1555,7 +1464,7 @@ function translateSystemEvent(message) {
 // src/controller.ts
 var import_obsidian5 = require("obsidian");
 var import_node_fs = require("node:fs");
-var import_node_path5 = require("node:path");
+var import_node_path4 = require("node:path");
 
 // src/domain-map.ts
 function validateDomainId(id) {
@@ -1667,10 +1576,8 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
       const { reasoning, content } = extractStreamDeltas(chunk);
       if (reasoning)
         yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-      if (content) {
+      if (content)
         fullText += content;
-        yield { kind: "assistant_text", delta: content };
-      }
     }
   } catch (e) {
     if (signal.aborted || e.name === "AbortError")
@@ -1679,8 +1586,6 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
       { ...params, stream: false }
     );
     fullText = resp.choices[0]?.message?.content ?? "";
-    if (fullText)
-      yield { kind: "assistant_text", delta: fullText };
   }
   if (signal.aborted)
     return;
@@ -1696,6 +1601,8 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
       yield { kind: "tool_result", ok: false, preview: e.message };
     }
   }
+  const resultText = buildIngestSummary(domain.id, sourceVaultPath, written, pages.length);
+  yield { kind: "assistant_text", delta: resultText };
   if (written.length > 0) {
     await appendLog(vaultTools, wikiRoot, sourceVaultPath, domain.id, written);
     await updateIndex(vaultTools, wikiRoot, written);
@@ -1708,11 +1615,19 @@ async function* runIngest(args, vaultTools, llm, model, domains, repoRoot, signa
       }
     }
   }
-  yield {
-    kind: "result",
-    durationMs: Date.now() - start,
-    text: pages.length > 0 ? `Ingested into ${pages.length} wiki page(s).` : "Ingested into 0 wiki page(s)."
-  };
+  yield { kind: "result", durationMs: Date.now() - start, text: resultText };
+}
+function buildIngestSummary(domainId, sourcePath, written, total) {
+  const src = sourcePath.split("/").pop() ?? sourcePath;
+  if (written.length === 0) {
+    return `\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A \xAB${src}\xBB \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0430\u043D \u2014 \u043D\u043E\u0432\u044B\u0445 \u0438\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D\u0438\u0446 \u043D\u0435\u0442.`;
+  }
+  const skipped = total - written.length;
+  const lines = [`\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A \xAB${src}\xBB \u2192 \u0434\u043E\u043C\u0435\u043D \xAB${domainId}\xBB: \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043E ${written.length} \u0441\u0442\u0440.${skipped > 0 ? `, \u043E\u0448\u0438\u0431\u043E\u043A ${skipped}` : ""}`];
+  for (const p of written) {
+    lines.push(`  \u2022 ${p.split("/").pop()}`);
+  }
+  return lines.join("\n");
 }
 function detectDomain(absFilePath, domains, repoRoot) {
   for (const d of domains) {
@@ -2080,6 +1995,48 @@ Actualizing domain config for "${domain.id}"...
       reportParts.push(diffReport);
       yield { kind: "domain_updated", domainId: domain.id, patch };
     }
+    if (signal.aborted)
+      return;
+    yield { kind: "assistant_text", delta: `
+Applying fixes for "${domain.id}"...
+` };
+    const fixMessages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, llmReport);
+    const fixParams = buildChatParams(model, fixMessages, opts);
+    let fixFullText = "";
+    try {
+      const fixStream = await llm.chat.completions.create(
+        { ...fixParams, stream: true },
+        { signal }
+      );
+      for await (const chunk of fixStream) {
+        const { content } = extractStreamDeltas(chunk);
+        if (content)
+          fixFullText += content;
+      }
+    } catch (e) {
+      if (signal.aborted || e.name === "AbortError")
+        return;
+      const resp = await llm.chat.completions.create(
+        { ...fixParams, stream: false }
+      );
+      fixFullText = resp.choices[0]?.message?.content ?? "";
+    }
+    const fixedPages = parseJsonPages(fixFullText);
+    const writtenPaths = [];
+    for (const page of fixedPages) {
+      yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+      try {
+        await vaultTools.write(page.path, page.content);
+        writtenPaths.push(page.path);
+        yield { kind: "tool_result", ok: true };
+      } catch (e) {
+        yield { kind: "tool_result", ok: false, preview: e.message };
+      }
+    }
+    if (writtenPaths.length > 0) {
+      reportParts.push(`### \u0418\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u0441\u0442\u0440\u0430\u043D\u0438\u0446: ${writtenPaths.length}
+${writtenPaths.map((p) => `- ${p.split("/").pop()}`).join("\n")}`);
+    }
   }
   yield { kind: "result", durationMs: Date.now() - start, text: reportParts.join("\n\n---\n\n") };
 }
@@ -2119,6 +2076,42 @@ function computeEntityDiff(oldTypes, newTypes) {
   removed.forEach((et) => lines.push(`- \u2716 \u0443\u0434\u0430\u043B\u0451\u043D: **${et.type}**`));
   modified.forEach((et) => lines.push(`- \u270E \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D: **${et.type}**`));
   return lines.join("\n");
+}
+function buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const pagesBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---
+${c}`).join("\n\n");
+  return [
+    {
+      role: "system",
+      content: [
+        `\u0422\u044B \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
+        `\u0418\u0441\u043F\u0440\u0430\u0432\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B \u0432 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430\u0445 \u0438 \u0432\u0435\u0440\u043D\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.`,
+        `\u041F\u0420\u0410\u0412\u0418\u041B\u0410: \u043C\u0451\u0440\u0442\u0432\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 [[X]] \u0443\u0431\u0435\u0440\u0438 \u0438\u043B\u0438 \u0437\u0430\u043C\u0435\u043D\u0438; \u043E\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439 frontmatter \u0434\u043E\u0431\u0430\u0432\u044C (wiki_updated: ${today}, wiki_status: stub); \u0434\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u043E\u0431\u044A\u0435\u0434\u0438\u043D\u0438; \u0440\u0430\u0437\u043C\u044B\u0442\u044B\u0435 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F \u0443\u0442\u043E\u0447\u043D\u0438.`,
+        entityTypesBlock ? `
+\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419:
+${entityTypesBlock}` : "",
+        `
+\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D\u0438\u0446:`,
+        `[{"path":"${wikiVaultPath}/EntityName.md","content":"\u043F\u043E\u043B\u043D\u044B\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442"}]`
+      ].filter(Boolean).join("\n")
+    },
+    {
+      role: "user",
+      content: [
+        `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
+        structuralIssues ? `
+\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
+${structuralIssues}` : "\n\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043E\u0431\u043D\u0430\u0440\u0443\u0436\u0435\u043D\u043E.",
+        `
+\u041E\u0442\u0447\u0451\u0442 Lint (\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u0438):
+${lintReport}`,
+        `
+Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
+${pagesBlock}`
+      ].join("\n")
+    }
+  ];
 }
 async function actualizeDomainConfig(domain, pages, llm, model, opts, signal) {
   const currentConfig = JSON.stringify({
@@ -2325,152 +2318,6 @@ async function tryRead3(vaultTools, path2) {
   }
 }
 
-// src/phases/fix.ts
-var import_node_path4 = require("node:path");
-var META_FILES3 = ["_index.md", "_log.md", "_schema.md"];
-async function* runFix(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}, lintReport) {
-  const domainId = args[0];
-  const domain = domainId ? domains.find((d) => d.id === domainId) : domains[0];
-  if (!domain) {
-    yield { kind: "error", message: domainId ? `Domain "${domainId}" not found.` : "No domains configured." };
-    return;
-  }
-  const absWiki = (0, import_node_path4.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path4.join)(repoRoot, domain.wiki_folder);
-  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
-  if (!wikiVaultPath) {
-    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
-    return;
-  }
-  yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
-  const allFiles = await vaultTools.listFiles(wikiVaultPath);
-  const files = allFiles.filter((f) => !META_FILES3.some((m) => f.endsWith(m)));
-  yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
-  if (files.length === 0) {
-    const start2 = Date.now();
-    yield { kind: "result", durationMs: Date.now() - start2, text: "No wiki pages to fix." };
-    return;
-  }
-  const pages = await vaultTools.readAll(files);
-  const structuralIssues = checkStructure(pages);
-  const entityTypesBlock = domain.entity_types?.length ? domain.entity_types.map((et) => `- ${et.type}: ${et.description}`).join("\n") : "";
-  yield { kind: "assistant_text", delta: `Fixing wiki pages for domain "${domain.id}"...
-` };
-  const start = Date.now();
-  const messages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport);
-  const params = buildChatParams(model, messages, opts);
-  let fullText = "";
-  try {
-    const stream = await llm.chat.completions.create(
-      { ...params, stream: true },
-      { signal }
-    );
-    for await (const chunk of stream) {
-      const { reasoning, content } = extractStreamDeltas(chunk);
-      if (reasoning)
-        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
-      if (content) {
-        fullText += content;
-        yield { kind: "assistant_text", delta: content };
-      }
-    }
-  } catch (e) {
-    if (signal.aborted || e.name === "AbortError")
-      return;
-    const resp = await llm.chat.completions.create(
-      { ...params, stream: false }
-    );
-    fullText = resp.choices[0]?.message?.content ?? "";
-    if (fullText)
-      yield { kind: "assistant_text", delta: fullText };
-  }
-  if (signal.aborted)
-    return;
-  const fixedPages = parseJsonPages(fullText);
-  const writtenPaths = [];
-  const errors = [];
-  for (const page of fixedPages) {
-    yield { kind: "tool_use", name: "Write", input: { path: page.path } };
-    try {
-      await vaultTools.write(page.path, page.content);
-      writtenPaths.push(page.path);
-      yield { kind: "tool_result", ok: true };
-    } catch (e) {
-      errors.push(`${page.path}: ${e.message}`);
-      yield { kind: "tool_result", ok: false, preview: e.message };
-    }
-  }
-  const summary = buildFixSummary(domain.id, writtenPaths, errors, structuralIssues, lintReport);
-  yield { kind: "result", durationMs: Date.now() - start, text: summary };
-}
-function buildFixSummary(domainId, writtenPaths, errors, structuralIssues, lintReport) {
-  const lines = [];
-  const source = lintReport ? "lint-\u043E\u0442\u0447\u0451\u0442\u0430" : "\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u043E\u0433\u043E \u0430\u043D\u0430\u043B\u0438\u0437\u0430";
-  if (writtenPaths.length > 0) {
-    lines.push(`\u0418\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${writtenPaths.length} \u0441\u0442\u0440. \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domainId}\xBB \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${source}:`);
-    for (const p of writtenPaths) {
-      const name = p.split("/").pop() ?? p;
-      lines.push(`  \u2022 ${name}`);
-    }
-  } else {
-    lines.push(`\u0414\u043E\u043C\u0435\u043D \xAB${domainId}\xBB: \u043F\u0440\u0430\u0432\u043A\u0438 \u043D\u0435 \u043F\u043E\u0442\u0440\u0435\u0431\u043E\u0432\u0430\u043B\u0438\u0441\u044C (\u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${source}).`);
-  }
-  if (errors.length > 0) {
-    lines.push(`
-\u041E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 (${errors.length}):`);
-    for (const e of errors)
-      lines.push(`  \u2716 ${e}`);
-  }
-  if (structuralIssues) {
-    lines.push(`
-\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
-${structuralIssues}`);
-  } else {
-    lines.push("\n\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043E\u0431\u043D\u0430\u0440\u0443\u0436\u0435\u043D\u043E.");
-  }
-  return lines.join("\n");
-}
-function buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport) {
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const pagesBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---
-${c}`).join("\n\n");
-  return [
-    {
-      role: "system",
-      content: [
-        `\u0422\u044B \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
-        `\u0418\u0441\u043F\u0440\u0430\u0432\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B \u0432 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430\u0445 \u0438 \u0432\u0435\u0440\u043D\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.`,
-        ``,
-        `\u041F\u0420\u0410\u0412\u0418\u041B\u0410 \u0418\u0421\u041F\u0420\u0410\u0412\u041B\u0415\u041D\u0418\u042F:`,
-        `- \u041C\u0451\u0440\u0442\u0432\u044B\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 [[X]]: \u0443\u0431\u0435\u0440\u0438 [[]] \u043E\u0441\u0442\u0430\u0432\u0438\u0432 \u0442\u0435\u043A\u0441\u0442 \u0438\u043B\u0438 \u0437\u0430\u043C\u0435\u043D\u0438 \u043D\u0430 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443`,
-        `- \u041E\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439 frontmatter: \u0434\u043E\u0431\u0430\u0432\u044C \u043C\u0438\u043D\u0438\u043C\u0430\u043B\u044C\u043D\u044B\u0439 (wiki_updated: ${today}, wiki_status: stub)`,
-        `- \u0414\u0443\u0431\u043B\u0438\u0440\u0443\u044E\u0449\u0438\u0439\u0441\u044F \u043A\u043E\u043D\u0442\u0435\u043D\u0442: \u043E\u0431\u044A\u0435\u0434\u0438\u043D\u0438, \u043D\u0435 \u0442\u0435\u0440\u044F\u0439 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u044E`,
-        `- \u0420\u0430\u0437\u043C\u044B\u0442\u044B\u0435 \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F: \u0443\u0442\u043E\u0447\u043D\u0438 \u043F\u043E \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0443 \u0434\u043E\u043C\u0435\u043D\u0430`,
-        entityTypesBlock ? `
-\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419:
-${entityTypesBlock}` : "",
-        ``,
-        `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D\u0438\u0446 (\u0435\u0441\u043B\u0438 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043D\u0435 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0430\u0441\u044C \u2014 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0430\u0439):`,
-        `[{"path":"${wikiVaultPath}/EntityName.md","content":"\u043F\u043E\u043B\u043D\u044B\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B"}]`
-      ].filter(Boolean).join("\n")
-    },
-    {
-      role: "user",
-      content: [
-        `\u0414\u043E\u043C\u0435\u043D: ${domain.id} (${domain.name})`,
-        structuralIssues ? `
-\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
-${structuralIssues}` : "\n\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043E\u0431\u043D\u0430\u0440\u0443\u0436\u0435\u043D\u043E.",
-        lintReport ? `
-\u041E\u0442\u0447\u0451\u0442 Lint (\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u0438 \u043A \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044E):
-${lintReport}` : "",
-        ``,
-        `Wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:
-${pagesBlock}`
-      ].filter(Boolean).join("\n")
-    }
-  ];
-}
-
 // src/agent-runner.ts
 var AgentRunner = class {
   constructor(llm, settings, vaultTools, vaultName, domains) {
@@ -2519,9 +2366,6 @@ var AgentRunner = class {
         break;
       case "init":
         yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
-        break;
-      case "fix":
-        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts, req.lintReport);
         break;
       default: {
         const start = Date.now();
@@ -2716,7 +2560,8 @@ var ClaudeCliClient = class {
     const child = (0, import_node_child_process.spawn)(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"] });
     if (!child.stdout || !child.stderr)
       throw new Error("spawn: missing stdio");
-    child.stderr.resume();
+    const stderrChunks = [];
+    child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
     const onAbort = () => {
       child.kill("SIGTERM");
       setTimeout(() => {
@@ -2763,11 +2608,15 @@ var ClaudeCliClient = class {
       }
     });
     let exited = false;
-    child.on("close", () => {
+    let exitCode = null;
+    let spawnError = null;
+    child.on("close", (code) => {
+      exitCode = code;
       exited = true;
       wake();
     });
-    child.on("error", () => {
+    child.on("error", (err) => {
+      spawnError = err;
       exited = true;
       wake();
     });
@@ -2781,6 +2630,13 @@ var ClaudeCliClient = class {
           break;
         await new Promise((r) => resolveNext = r);
       }
+      const stderr = () => Buffer.concat(stderrChunks).toString("utf8").trim();
+      if (spawnError)
+        throw new Error(`claude spawn failed: ${spawnError.message}${stderr() ? `
+${stderr()}` : ""}`);
+      if (exitCode !== null && exitCode !== 0)
+        throw new Error(`claude exited with code ${exitCode}${stderr() ? `
+${stderr()}` : ""}`);
       if (timedOut)
         throw new Error(`claude process timed out after ${timeoutSec}s`);
       yield {
@@ -10007,9 +9863,6 @@ var WikiController = class {
     const args = dryRun ? [domain, "--dry-run"] : [domain];
     await this.dispatch("init", args);
   }
-  async fix(domain, lintReport) {
-    await this.dispatch("fix", [domain], void 0, lintReport);
-  }
   cwdOrEmpty() {
     return this.app.vault.adapter.getBasePath?.() ?? "";
   }
@@ -10032,13 +9885,13 @@ var WikiController = class {
       return { ok: false, error: msg };
     }
     const vaultName = this.app.vault.getName();
-    const wikiRoot = `vaults/${vaultName}/!Wiki`;
-    const wikiFolder = input.wikiFolder.trim() || `${wikiRoot}/${id}`;
+    const vaultPrefix = `vaults/${vaultName}`;
+    const wikiRelative = input.wikiFolder.trim() || `!Wiki/${id}`;
     s.domains.push({
       id,
       name: input.name.trim() || id,
-      wiki_folder: wikiFolder,
-      source_paths: input.sourcePaths.map((p) => p.trim()).filter(Boolean),
+      wiki_folder: `${vaultPrefix}/${wikiRelative}`,
+      source_paths: [],
       entity_types: [],
       language_notes: ""
     });
@@ -10077,14 +9930,14 @@ var WikiController = class {
     try {
       const stat = (0, import_node_fs.existsSync)(logPath) ? (0, import_node_fs.statSync)(logPath) : null;
       if (stat?.isDirectory() || !logPath.includes(".") && !logPath.endsWith("/")) {
-        logPath = (0, import_node_path5.join)(logPath, "agent.jsonl");
+        logPath = (0, import_node_path4.join)(logPath, "agent.jsonl");
       }
       const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), session: sessionId, op, domainId, event: ev }) + "\n";
       (0, import_node_fs.appendFileSync)(logPath, line, "utf-8");
     } catch {
     }
   }
-  async dispatch(op, args, domainId, lintReport) {
+  async dispatch(op, args, domainId) {
     if (this.isBusy()) {
       new import_obsidian5.Notice(i18n().ctrl.operationRunning);
       return;
@@ -10110,7 +9963,7 @@ var WikiController = class {
     const vaultSuffix = `/vaults/${vaultName}`;
     const repoRoot = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
     const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1e3;
-    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId, lintReport });
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
     try {
       for await (const ev of runGen) {
         this.logEvent(sessionId, op, domainId, ev);
@@ -10211,9 +10064,9 @@ var WikiController = class {
     return view instanceof LlmWikiView ? view : null;
   }
   toVaultPath(vaultDir, savedPath) {
-    const abs = (0, import_node_path5.isAbsolute)(savedPath) ? savedPath : (0, import_node_path5.join)(vaultDir, savedPath);
-    const rel = (0, import_node_path5.relative)(vaultDir, abs);
-    if (rel.startsWith("..") || (0, import_node_path5.isAbsolute)(rel))
+    const abs = (0, import_node_path4.isAbsolute)(savedPath) ? savedPath : (0, import_node_path4.join)(vaultDir, savedPath);
+    const rel = (0, import_node_path4.relative)(vaultDir, abs);
+    if (rel.startsWith("..") || (0, import_node_path4.isAbsolute)(rel))
       return null;
     return rel;
   }
@@ -10227,7 +10080,7 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
     await this.loadSettings();
     this.controller = new WikiController(this.app, this);
     this.registerView(LLM_WIKI_VIEW_TYPE, (leaf) => new LlmWikiView(leaf, this));
-    this.addRibbonIcon("brain-circuit", "LLM wiki", () => {
+    this.addRibbonIcon("brain-circuit", "LLM Wiki", () => {
       const leaves = this.app.workspace.getLeavesOfType(LLM_WIKI_VIEW_TYPE);
       if (leaves.length > 0) {
         void this.app.workspace.revealLeaf(leaves[0]);
@@ -10274,21 +10127,6 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
           null,
           domains,
           (d) => void this.controller.lint(d)
-        ).open();
-      }
-    });
-    this.addCommand({
-      id: "fix",
-      name: T.cmd.fix,
-      callback: () => {
-        const domains = this.controller.loadDomains();
-        new DomainModal(
-          this.app,
-          T.cmd.fix,
-          true,
-          null,
-          domains,
-          (d) => void this.controller.fix(d)
         ).open();
       }
     });

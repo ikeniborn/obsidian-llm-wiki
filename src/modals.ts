@@ -38,7 +38,8 @@ export class QueryModal extends Modal {
     const { contentEl } = this;
     contentEl.createEl("h3", { text: this.save ? T.queryAndSave : T.query });
     const ta = contentEl.createEl("textarea", {
-      attr: { rows: "5", style: "width:100%;" },
+      cls: "llm-wiki-modal-input",
+      attr: { rows: "5" },
       placeholder: T.queryPlaceholder,
     });
     ta.addEventListener("input", () => { this.question = ta.value; });
@@ -202,7 +203,7 @@ export class EditDomainModal extends Modal {
       .setName(T.sourcePathsLabel)
       .addTextArea((t) => {
         t.inputEl.rows = 4;
-        t.inputEl.style.width = "100%";
+        t.inputEl.addClass("llm-wiki-settings-textarea");
         t.setValue(this.sourcePathsVal).onChange((v) => { this.sourcePathsVal = v; });
       });
 
@@ -210,8 +211,8 @@ export class EditDomainModal extends Modal {
       .setName(T.entityTypesLabel)
       .addTextArea((t) => {
         t.inputEl.rows = 10;
-        t.inputEl.style.width = "100%";
-        t.inputEl.style.fontFamily = "monospace";
+        t.inputEl.addClass("llm-wiki-settings-textarea");
+        t.inputEl.addClass("llm-wiki-monospace");
         t.setValue(this.entityTypesVal).onChange((v) => { this.entityTypesVal = v; });
       });
 
@@ -219,8 +220,7 @@ export class EditDomainModal extends Modal {
       .setName(T.languageNotesLabel)
       .addText((t) => t.setValue(this.languageNotesVal).onChange((v) => { this.languageNotesVal = v; }));
 
-    this.errorEl = contentEl.createEl("p", { cls: "mod-warning" });
-    this.errorEl.style.display = "none";
+    this.errorEl = contentEl.createEl("p", { cls: "mod-warning llm-wiki-hidden" });
 
     new Setting(contentEl)
       .addButton((b) => b.setButtonText(T.cancel).onClick(() => this.close()))
@@ -228,7 +228,7 @@ export class EditDomainModal extends Modal {
   }
 
   private handleSave(): void {
-    if (this.errorEl) this.errorEl.style.display = "none";
+    this.errorEl?.addClass("llm-wiki-hidden");
     let entityTypes: EntityType[];
     try {
       const parsed = JSON.parse(this.entityTypesVal.trim() || "[]");
@@ -240,7 +240,7 @@ export class EditDomainModal extends Modal {
     } catch {
       if (this.errorEl) {
         this.errorEl.textContent = i18n().modal.entityTypesError;
-        this.errorEl.style.display = "";
+        this.errorEl.removeClass("llm-wiki-hidden");
       }
       return;
     }

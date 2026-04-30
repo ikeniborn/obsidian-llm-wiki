@@ -1,5 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
-import { EditDomainModal } from "./modals";
+import { ConfirmModal, EditDomainModal } from "./modals";
 import type LlmWikiPlugin from "./main";
 import type { LlmWikiPluginSettings, OpKey } from "./types";
 import { i18n } from "./i18n";
@@ -94,20 +94,25 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           .setDesc(d.id)
           .addButton((b) =>
             b.setButtonText(T.settings.editDomain).onClick(() => {
-              new EditDomainModal(this.plugin.app, d, async (updated) => {
-                s.domains[i] = updated;
-                await this.plugin.saveSettings();
-                this.display();
+              new EditDomainModal(this.plugin.app, d, (updated) => {
+                void (async () => {
+                  s.domains[i] = updated;
+                  await this.plugin.saveSettings();
+                  this.display();
+                })();
               }).open();
             }),
           )
           .addButton((b) =>
-            b.setButtonText(T.settings.deleteDomain).setWarning().onClick(async () => {
-              if (!confirm(T.settings.confirmDeleteDomain(d.id))) return;
-              new Notice(T.settings.domainDeleted(d.id));
-              s.domains.splice(i, 1);
-              await this.plugin.saveSettings();
-              this.display();
+            b.setButtonText(T.settings.deleteDomain).setWarning().onClick(() => {
+              new ConfirmModal(this.plugin.app, T.settings.confirmDeleteDomain(d.id), [], () => {
+                void (async () => {
+                  new Notice(T.settings.domainDeleted(d.id));
+                  s.domains.splice(i, 1);
+                  await this.plugin.saveSettings();
+                  this.display();
+                })();
+              }).open();
             }),
           );
       }
@@ -145,6 +150,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           .setName(T.settings.model_name)
           .setDesc(T.settings.model_desc_claude)
           .addText((t) =>
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             t.setPlaceholder("sonnet")
               .setValue(s.claudeAgent.model)
               .onChange(async (v) => { s.claudeAgent.model = v.trim(); await this.plugin.saveSettings(); }),
@@ -192,6 +198,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         .setName(T.settings.baseUrl_name)
         .setDesc(T.settings.baseUrl_desc)
         .addText((t) =>
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
           t.setPlaceholder("http://localhost:11434/v1")
             .setValue(s.nativeAgent.baseUrl)
             .onChange(async (v) => { s.nativeAgent.baseUrl = v.trim(); await this.plugin.saveSettings(); }),
@@ -201,6 +208,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         .setName(T.settings.apiKey_name)
         .setDesc(T.settings.apiKey_desc)
         .addText((t) =>
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
           t.setPlaceholder("ollama")
             .setValue(s.nativeAgent.apiKey)
             .onChange(async (v) => { s.nativeAgent.apiKey = v.trim(); await this.plugin.saveSettings(); }),
@@ -211,6 +219,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           .setName(T.settings.model_name)
           .setDesc(T.settings.model_desc_native)
           .addText((t) =>
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             t.setPlaceholder("llama3.2")
               .setValue(s.nativeAgent.model)
               .onChange(async (v) => { s.nativeAgent.model = v.trim(); await this.plugin.saveSettings(); }),

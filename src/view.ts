@@ -50,7 +50,7 @@ export class LlmWikiView extends ItemView {
   }
 
   getViewType(): string { return LLM_WIKI_VIEW_TYPE; }
-  getDisplayText(): string { return "LLM wiki"; }
+  getDisplayText(): string { return "LLM Wiki"; }
   getIcon(): string { return "brain-circuit"; }
 
   onOpen(): void {
@@ -59,7 +59,7 @@ export class LlmWikiView extends ItemView {
     root.addClass("llm-wiki-view");
 
     const header = root.createDiv("llm-wiki-header");
-    header.createEl("h3", { text: "LLM wiki" });
+    header.createEl("h3", { text: "LLM Wiki" });
     this.statusEl = header.createDiv("llm-wiki-status");
 
     // Domain selector + per-domain actions

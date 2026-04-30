@@ -69,7 +69,8 @@ export class ClaudeCliClient implements LlmClient {
   ): AsyncGenerator<OpenAI.Chat.ChatCompletionChunk> {
     const child = spawn(this.cfg.iclaudePath, args, { stdio: ["ignore", "pipe", "pipe"] });
     if (!child.stdout || !child.stderr) throw new Error("spawn: missing stdio");
-    child.stderr.resume();
+    const stderrChunks: Buffer[] = [];
+    child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
 
     const onAbort = () => {
       child.kill("SIGTERM");
@@ -109,8 +110,10 @@ export class ClaudeCliClient implements LlmClient {
     });
 
     let exited = false;
-    child.on("close", () => { exited = true; wake(); });
-    child.on("error", () => { exited = true; wake(); });
+    let exitCode: number | null = null;
+    let spawnError: Error | null = null;
+    child.on("close", (code) => { exitCode = code; exited = true; wake(); });
+    child.on("error", (err) => { spawnError = err; exited = true; wake(); });
 
     try {
       while (true) {
@@ -118,6 +121,9 @@ export class ClaudeCliClient implements LlmClient {
         if (exited) break;
         await new Promise<void>((r) => (resolveNext = r));
       }
+      const stderr = () => Buffer.concat(stderrChunks).toString("utf8").trim();
+      if (spawnError) throw new Error(`claude spawn failed: ${spawnError.message}${stderr() ? `\n${stderr()}` : ""}`);
+      if (exitCode !== null && exitCode !== 0) throw new Error(`claude exited with code ${exitCode}${stderr() ? `\n${stderr()}` : ""}`);
       if (timedOut) throw new Error(`claude process timed out after ${timeoutSec}s`);
       yield {
         id: `cc-${++id}`,
