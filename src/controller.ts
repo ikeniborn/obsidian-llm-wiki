@@ -2,7 +2,7 @@ import { App, Notice } from "obsidian";
 import { existsSync, appendFileSync, statSync } from "node:fs";
 import { relative, isAbsolute, join } from "node:path";
 import { LLM_WIKI_VIEW_TYPE, LlmWikiView } from "./view";
-import { readDomains, addDomain, type DomainEntry, type AddDomainInput } from "./domain-map";
+import { validateDomainId, type DomainEntry, type AddDomainInput } from "./domain-map";
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
 import { AgentRunner } from "./agent-runner";
@@ -47,27 +47,39 @@ export class WikiController {
     await this.dispatch("init", args);
   }
 
-  private resolveDomainMapDir(): string {
-    const s = this.plugin.settings;
-    if (s.domainMapDir) return s.domainMapDir;
-    const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    return join(base, this.app.vault.configDir, "plugins", "obsidian-llm-wiki");
-  }
-
   cwdOrEmpty(): string {
     return (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
   }
 
   loadDomains(): DomainEntry[] {
-    return readDomains(this.resolveDomainMapDir(), this.app.vault.getName());
+    return this.plugin.settings.domains ?? [];
   }
 
   registerDomain(input: AddDomainInput): { ok: true } | { ok: false; error: string } {
-    const vaultBase = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
-    const r = addDomain(this.resolveDomainMapDir(), this.app.vault.getName(), vaultBase, input);
-    if (r.ok) new Notice(i18n().ctrl.domainAdded(input.id));
-    else new Notice(i18n().ctrl.domainAddFailed(r.error));
-    return r;
+    const id = input.id.trim();
+    const err = validateDomainId(id);
+    if (err) { new Notice(i18n().ctrl.domainAddFailed(err)); return { ok: false, error: err }; }
+    const s = this.plugin.settings;
+    if (!s.domains) s.domains = [];
+    if (s.domains.some((d) => d.id === id)) {
+      const msg = `Домен «${id}» уже существует`;
+      new Notice(i18n().ctrl.domainAddFailed(msg));
+      return { ok: false, error: msg };
+    }
+    const vaultName = this.app.vault.getName();
+    const wikiRoot = `vaults/${vaultName}/!Wiki`;
+    const wikiFolder = input.wikiFolder.trim() || `${wikiRoot}/${id}`;
+    s.domains.push({
+      id,
+      name: input.name.trim() || id,
+      wiki_folder: wikiFolder,
+      source_paths: input.sourcePaths.map((p) => p.trim()).filter(Boolean),
+      entity_types: [],
+      language_notes: "",
+    });
+    void this.plugin.saveSettings();
+    new Notice(i18n().ctrl.domainAdded(id));
+    return { ok: true };
   }
 
   private requireClaudeAgent(): string | null {
@@ -84,8 +96,7 @@ export class WikiController {
     const base = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
     const vaultTools = new VaultTools(adapter, base);
     const vaultName = this.app.vault.getName();
-    const domainMapDir = this.resolveDomainMapDir();
-    const domains = readDomains(domainMapDir, vaultName);
+    const domains = this.plugin.settings.domains ?? [];
     const s = this.plugin.settings;
 
     const maxTimeoutSec = Math.max(...Object.values(s.timeouts));
@@ -98,7 +109,7 @@ export class WikiController {
           dangerouslyAllowBrowser: true,
         });
 
-    return new AgentRunner(llm, s, vaultTools, vaultName, domains, domainMapDir);
+    return new AgentRunner(llm, s, vaultTools, vaultName, domains);
   }
 
   private logEvent(sessionId: string, op: WikiOperation, domainId: string | undefined, ev: RunEvent): void {
@@ -154,6 +165,11 @@ export class WikiController {
       for await (const ev of runGen) {
         this.logEvent(sessionId, op, domainId, ev);
         view.appendEvent(ev);
+        if (ev.kind === "domain_created") {
+          if (!this.plugin.settings.domains) this.plugin.settings.domains = [];
+          this.plugin.settings.domains.push(ev.entry);
+          void this.plugin.saveSettings();
+        }
         this.collectStep(ev, steps);
         if (ev.kind === "result") finalText = ev.text;
         if (ev.kind === "error") status = "error";
