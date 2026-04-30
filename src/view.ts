@@ -31,9 +31,10 @@ export class LlmWikiView extends ItemView {
   private askBtn!: HTMLButtonElement;
   private askSaveBtn!: HTMLButtonElement;
   private domainSelect!: HTMLSelectElement;
-  private lintBtn!: HTMLButtonElement;
   private initBtn!: HTMLButtonElement;
   private ingestBtn!: HTMLButtonElement;
+  private lintBtn!: HTMLButtonElement;
+  private fixBtn!: HTMLButtonElement;
   private startTs = 0;
   private toolCount = 0;
   private stepCount = 0;
@@ -74,10 +75,21 @@ export class LlmWikiView extends ItemView {
     addBtn.addEventListener("click", () => this.openAddDomain());
 
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
+    this.initBtn = actionRow.createEl("button", { text: T.view.init });
     this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
     this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
-    this.initBtn = actionRow.createEl("button", { text: T.view.init });
+    this.fixBtn = actionRow.createEl("button", { text: T.view.fix });
 
+    this.domainSelect.addEventListener("change", () => this.updateInitBtn());
+
+    this.initBtn.addEventListener("click", () => {
+      const d = this.domainSelect.value;
+      if (!d) { new Notice(i18n().view.selectDomainForInit); return; }
+      new ConfirmModal(this.plugin.app, "Init — confirm", [
+        `Domain: «${d}»`,
+        "Claude will generate entity_types and language_notes for the domain.",
+      ], () => void this.plugin.controller.init(d, false)).open();
+    });
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
       if (!file) { new Notice(i18n().view.noActiveFile); return; }
@@ -92,16 +104,16 @@ export class LlmWikiView extends ItemView {
       const domainLabel = d ? `«${d}»` : "all wiki";
       new ConfirmModal(this.plugin.app, "Lint — confirm", [
         `Domain: ${domainLabel}`,
-        "Claude will check wiki pages for quality standards.",
+        "Claude will check wiki pages for quality and update entity_types.",
       ], () => void this.plugin.controller.lint(d || "all")).open();
     });
-    this.initBtn.addEventListener("click", () => {
+    this.fixBtn.addEventListener("click", () => {
       const d = this.domainSelect.value;
       if (!d) { new Notice(i18n().view.selectDomainForInit); return; }
-      new ConfirmModal(this.plugin.app, "Init — confirm", [
+      new ConfirmModal(this.plugin.app, "Fix — confirm", [
         `Domain: «${d}»`,
-        "Claude will create the folder structure and base wiki pages for the domain.",
-      ], () => void this.plugin.controller.init(d, false)).open();
+        "Claude will fix dead links, missing frontmatter and other issues in wiki pages.",
+      ], () => void this.plugin.controller.fix(d)).open();
     });
 
     this.refreshDomains();
@@ -166,6 +178,17 @@ export class LlmWikiView extends ItemView {
     if (previous && Array.from(this.domainSelect.options).some((o) => o.value === previous)) {
       this.domainSelect.value = previous;
     }
+    this.updateInitBtn();
+  }
+
+  private updateInitBtn(): void {
+    if (this.state === "running") return;
+    const domainId = this.domainSelect.value;
+    if (!domainId) { this.initBtn.disabled = true; return; }
+    const domain = this.plugin.controller.loadDomains().find((d) => d.id === domainId);
+    const isNew = !domain?.entity_types?.length;
+    this.initBtn.disabled = !isNew;
+    this.initBtn.title = isNew ? "" : "Already initialised — use Lint to update entity_types";
   }
 
   private openAddDomain(): void {
@@ -202,9 +225,10 @@ export class LlmWikiView extends ItemView {
     this.cancelBtn.disabled = false;
     this.askBtn.disabled = true;
     this.askSaveBtn.disabled = true;
+    this.initBtn.disabled = true;
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
-    this.initBtn.disabled = true;
+    this.fixBtn.disabled = true;
 
     this.resultSection.addClass("llm-wiki-hidden");
     this.finalEl.empty();
@@ -316,7 +340,8 @@ export class LlmWikiView extends ItemView {
     this.askSaveBtn.disabled = false;
     this.ingestBtn.disabled = false;
     this.lintBtn.disabled = false;
-    this.initBtn.disabled = false;
+    this.fixBtn.disabled = false;
+    this.updateInitBtn();
     if (this.tickHandle !== null) { window.clearInterval(this.tickHandle); this.tickHandle = null; }
     this.stepsOpen = false;
     this.stepsEl.addClass("llm-wiki-hidden");
