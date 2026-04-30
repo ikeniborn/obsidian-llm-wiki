@@ -12,7 +12,6 @@ export async function* runInit(
   domains: DomainEntry[],
   repoRoot: string,
   vaultName: string,
-  domainMapDir: string,
   signal: AbortSignal,
   opts: LlmCallOptions = {},
 ): AsyncGenerator<RunEvent> {
@@ -38,7 +37,6 @@ export async function* runInit(
   const sampleFiles = allFiles.slice(0, 5);
   const samples = await vaultTools.readAll(sampleFiles);
 
-  // Determine likely wiki root from vault structure
   const wikiRootGuess = `!Wiki`;
   const [schemaContent, indexContent] = await Promise.all([
     tryRead(vaultTools, `${wikiRootGuess}/_schema.md`),
@@ -117,36 +115,16 @@ export async function* runInit(
     return;
   }
 
-  const { domainMapPath, addDomain } = await import("../domain-map");
-  const dmPath = domainMapPath(domainMapDir, vaultName);
-  yield { kind: "tool_use", name: "Write", input: { path: dmPath } };
+  yield { kind: "tool_use", name: "SaveDomain", input: { id: entry.id } };
+  yield { kind: "domain_created", entry };
+  yield { kind: "tool_result", ok: true };
 
-  try {
-    const result = addDomain(domainMapDir, vaultName, repoRoot, {
-      id: entry.id,
-      name: entry.name ?? entry.id,
-      wikiFolder: entry.wiki_folder,
-      sourcePaths: entry.source_paths ?? [],
-    });
-    if (!result.ok) {
-      yield { kind: "tool_result", ok: false, preview: result.error };
-      yield { kind: "error", message: result.error };
-      return;
-    }
-    yield { kind: "tool_result", ok: true };
-  } catch (e) {
-    yield { kind: "tool_result", ok: false, preview: (e as Error).message };
-    yield { kind: "error", message: (e as Error).message };
-    return;
-  }
-
-  // Append log entry
   await appendLog(vaultTools, wikiRootGuess, domainId);
 
   yield {
     kind: "result",
     durationMs: Date.now() - start,
-    text: `Domain "${domainId}" initialised. Edit domain-map to refine source_paths and entity_types.`,
+    text: `Domain "${domainId}" initialised. Edit entity_types in plugin settings to refine extraction.`,
   };
 }
 
