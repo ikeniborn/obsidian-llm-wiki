@@ -217,6 +217,20 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           );
 
         new Setting(containerEl)
+          .setName(T.settings.numCtx_name)
+          .setDesc(T.settings.numCtx_desc)
+          .addText((t) =>
+            t.setPlaceholder("(дефолт модели)")
+              .setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "")
+              .onChange(async (v) => {
+                const trimmed = v.trim();
+                if (!trimmed) { s.nativeAgent.numCtx = null; }
+                else { const n = Number(trimmed); if (Number.isFinite(n) && n > 0) s.nativeAgent.numCtx = Math.floor(n); }
+                await this.plugin.saveSettings();
+              }),
+          );
+
+        new Setting(containerEl)
           .setName(T.settings.temperature_name)
           .setDesc(T.settings.temperature_desc)
           .addText((t) =>
@@ -276,33 +290,6 @@ export class LlmWikiSettingTab extends PluginSettingTab {
         }
       }
 
-      new Setting(containerEl)
-        .setName(T.settings.topP_name)
-        .setDesc(T.settings.topP_desc)
-        .addText((t) =>
-          t.setPlaceholder("(отключено)")
-            .setValue(s.nativeAgent.topP != null ? String(s.nativeAgent.topP) : "")
-            .onChange(async (v) => {
-              const trimmed = v.trim();
-              if (!trimmed) { s.nativeAgent.topP = null; }
-              else { const n = Number(trimmed); if (Number.isFinite(n) && n >= 0 && n <= 1) s.nativeAgent.topP = n; }
-              await this.plugin.saveSettings();
-            }),
-        );
-
-      new Setting(containerEl)
-        .setName(T.settings.numCtx_name)
-        .setDesc(T.settings.numCtx_desc)
-        .addText((t) =>
-          t.setPlaceholder("(дефолт модели)")
-            .setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "")
-            .onChange(async (v) => {
-              const trimmed = v.trim();
-              if (!trimmed) { s.nativeAgent.numCtx = null; }
-              else { const n = Number(trimmed); if (Number.isFinite(n) && n > 0) s.nativeAgent.numCtx = Math.floor(n); }
-              await this.plugin.saveSettings();
-            }),
-        );
     }
   }
 }
