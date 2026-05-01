@@ -24,8 +24,8 @@ export async function* runInit(
   }
 
   const existing = domains.find((d) => d.id === domainId);
-  if (existing) {
-    yield { kind: "error", message: `Domain "${domainId}" already exists in domain-map.` };
+  if (existing?.entity_types?.length) {
+    yield { kind: "error", message: `Domain "${domainId}" already initialised. Use Lint to update entity_types.` };
     return;
   }
 
@@ -115,8 +115,12 @@ export async function* runInit(
     return;
   }
 
-  yield { kind: "tool_use", name: "SaveDomain", input: { id: entry.id } };
-  yield { kind: "domain_created", entry };
+  yield { kind: "tool_use", name: existing ? "UpdateDomain" : "SaveDomain", input: { id: entry.id } };
+  if (existing) {
+    yield { kind: "domain_updated", domainId: entry.id, patch: { entity_types: entry.entity_types, language_notes: entry.language_notes } };
+  } else {
+    yield { kind: "domain_created", entry };
+  }
   yield { kind: "tool_result", ok: true };
 
   await appendLog(vaultTools, wikiRootGuess, domainId);

@@ -1,15 +1,25 @@
 .llm-wiki-view { padding: 8px; font-size: 13px; }
-.llm-wiki-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.llm-wiki-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .llm-wiki-header h3 { margin: 0; }
 .llm-wiki-status { color: var(--text-muted); }
 
-.llm-wiki-domain { margin: 8px 0; display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; background: var(--background-secondary); border-radius: 4px; }
-.llm-wiki-domain-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.llm-wiki-domain-select { flex: 1; min-width: 120px; padding: 4px; }
-.llm-wiki-domain-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* Section labels */
+.llm-wiki-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin: 10px 0 4px; }
+
+/* 1. Создание — Init */
+.llm-wiki-create-row { margin-bottom: 8px; }
+.llm-wiki-init-btn { width: 100%; }
+
+/* 2+3. Домен — Ingest / Lint */
+.llm-wiki-domain { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; background: var(--background-secondary); border-radius: 4px; margin-bottom: 8px; }
+.llm-wiki-domain-row { display: flex; align-items: center; gap: 6px; }
+.llm-wiki-domain-select { flex: 1; min-width: 0; padding: 4px; }
+.llm-wiki-domain-actions { display: flex; gap: 6px; }
+.llm-wiki-domain-actions button { flex: 1; }
 .llm-wiki-dryrun { color: var(--text-muted); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; }
 
-.llm-wiki-ask { margin: 8px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+/* 4. Запрос */
+.llm-wiki-ask { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .llm-wiki-query-input { width: 100%; resize: vertical; font-family: inherit; padding: 6px; }
 .llm-wiki-ask-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .llm-wiki-ask-row button { flex: 0 0 auto; }
@@ -54,6 +64,19 @@
 .llm-wiki-step.err { color: var(--text-error); }
 
 .llm-wiki-final { border-top: 1px dashed var(--background-modifier-border); padding-top: 8px; margin-top: 8px; }
+/* Чат после lint */
+.llm-wiki-chat-section { margin-top: 10px; border-top: 1px solid var(--background-modifier-border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.llm-wiki-chat-messages { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+.llm-wiki-chat-msg { padding: 6px 8px; border-radius: 6px; font-size: 13px; line-height: 1.5; }
+.llm-wiki-chat-msg--user { background: var(--background-modifier-form-field); align-self: flex-end; max-width: 90%; white-space: pre-wrap; word-break: break-word; }
+.llm-wiki-chat-msg--assistant { background: var(--background-secondary); align-self: flex-start; max-width: 95%; }
+.llm-wiki-chat-msg--streaming { opacity: 0.7; font-style: italic; }
+.llm-wiki-chat-msg--error { color: var(--text-error); }
+.llm-wiki-chat-msg--assistant p { margin: 0 0 4px; }
+.llm-wiki-chat-msg--assistant p:last-child { margin: 0; }
+.llm-wiki-chat-input-row { display: flex; gap: 6px; align-items: flex-end; }
+.llm-wiki-chat-input { flex: 1; resize: none; font-family: inherit; padding: 6px; }
+.llm-wiki-chat-send { flex: 0 0 auto; }
 .llm-wiki-history-row { padding: 3px 0; cursor: pointer; }
 .llm-wiki-history-row:hover { background: var(--background-modifier-hover); }
 

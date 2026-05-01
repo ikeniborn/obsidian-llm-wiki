@@ -2,6 +2,8 @@ import type { DomainEntry } from "./domain-map";
 import { runIngest } from "./phases/ingest";
 import { runQuery } from "./phases/query";
 import { runLint } from "./phases/lint";
+import { runFix } from "./phases/fix";
+import { runLintChat } from "./phases/chat";
 import { runInit } from "./phases/init";
 import type { LlmCallOptions, LlmClient, LlmWikiPluginSettings, OpKey, RunEvent, RunRequest } from "./types";
 import type { VaultTools } from "./vault-tools";
@@ -16,22 +18,18 @@ export class AgentRunner {
   ) {}
 
   private buildOptsFor(op: RunRequest["operation"]): { model: string; opts: LlmCallOptions } {
-    const key = (op === "query-save" ? "query" : op) as OpKey;
+    const key = (op === "query-save" ? "query" : (op === "fix" || op === "chat") ? "lint" : op) as OpKey;
     const s = this.settings;
 
     if (s.backend === "claude-agent") {
-      if (s.claudeAgent.perOperation) {
-        const c = s.claudeAgent.operations[key];
-        return { model: c.model, opts: { maxTokens: c.maxTokens, systemPrompt: s.systemPrompt } };
-      }
+      const c = s.claudeAgent.perOperation ? s.claudeAgent.operations[key] : undefined;
+      if (c) return { model: c.model, opts: { maxTokens: c.maxTokens, systemPrompt: s.systemPrompt } };
       return { model: s.claudeAgent.model, opts: { maxTokens: s.maxTokens, systemPrompt: s.systemPrompt } };
     }
 
     const na = s.nativeAgent;
-    if (na.perOperation) {
-      const c = na.operations[key];
-      return { model: c.model, opts: { maxTokens: c.maxTokens, temperature: c.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
-    }
+    const c = na.perOperation ? na.operations[key] : undefined;
+    if (c) return { model: c.model, opts: { maxTokens: c.maxTokens, temperature: c.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
     return { model: na.model, opts: { maxTokens: s.maxTokens, temperature: na.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
   }
 
@@ -59,6 +57,14 @@ export class AgentRunner {
       case "lint":
         yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
+      case "fix":
+        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts, req.context, req.instruction);
+        break;
+      case "chat": {
+        const domain = req.domainId ? this.domains.find((d) => d.id === req.domainId) : undefined;
+        yield* runLintChat(this.llm, model, domain, req.signal, opts, req.context ?? "", req.chatMessages ?? []);
+        break;
+      }
       case "init":
         yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
         break;

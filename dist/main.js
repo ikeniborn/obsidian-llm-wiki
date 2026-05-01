@@ -33,7 +33,7 @@ var DEFAULT_SETTINGS = {
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 900, init: 3600 },
+  timeouts: { ingest: 300, query: 300, lint: 900, fix: 900, init: 3600 },
   history: [],
   claudeAgent: {
     iclaudePath: "",
@@ -132,9 +132,16 @@ var en = {
   view: {
     refreshTitle: "Refresh domains",
     addDomain: "Add domain",
+    sectionCreate: "Create",
+    sectionDomain: "Fill / Maintain",
+    sectionQuery: "Query",
     ingest: "Ingest",
     lint: "Lint",
-    init: "Init",
+    fixPlaceholder: "Describe the task for the model (Enter to send, Shift+Enter for newline)\u2026",
+    fixSend: "Send",
+    chatLabel: "Chat",
+    chatSend: "Send",
+    init: "Init new domain",
     ask: "Ask",
     askAndSave: "Ask and save",
     cancel: "Cancel",
@@ -258,9 +265,16 @@ var ru = {
   view: {
     refreshTitle: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D\u044B",
     addDomain: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0434\u043E\u043C\u0435\u043D",
+    sectionCreate: "\u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435",
+    sectionDomain: "\u041D\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435 / \u0410\u043A\u0442\u0443\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F",
+    sectionQuery: "\u0417\u0430\u043F\u0440\u043E\u0441",
     ingest: "Ingest",
     lint: "Lint",
-    init: "Init",
+    fixPlaceholder: "\u041E\u043F\u0438\u0448\u0438\u0442\u0435 \u0437\u0430\u0434\u0430\u0447\u0443 \u0434\u043B\u044F \u043C\u043E\u0434\u0435\u043B\u0438 (Enter \u2014 \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C, Shift+Enter \u2014 \u043F\u0435\u0440\u0435\u043D\u043E\u0441)\u2026",
+    fixSend: "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C",
+    chatLabel: "\u0427\u0430\u0442",
+    chatSend: "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C",
+    init: "Init \u2014 \u043D\u043E\u0432\u044B\u0439 \u0434\u043E\u043C\u0435\u043D",
     ask: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C",
     askAndSave: "\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
     cancel: "\u041E\u0442\u043C\u0435\u043D\u0430",
@@ -384,9 +398,16 @@ var es = {
   view: {
     refreshTitle: "Actualizar dominios",
     addDomain: "A\xF1adir dominio",
+    sectionCreate: "Crear",
+    sectionDomain: "Rellenar / Mantener",
+    sectionQuery: "Consulta",
     ingest: "Ingest",
     lint: "Lint",
-    init: "Init",
+    fixPlaceholder: "Describe la tarea para el modelo (Enter para enviar, Shift+Enter nueva l\xEDnea)\u2026",
+    fixSend: "Enviar",
+    chatLabel: "Chat",
+    chatSend: "Enviar",
+    init: "Init \u2014 nuevo dominio",
     ask: "Preguntar",
     askAndSave: "Preguntar y guardar",
     cancel: "Cancelar",
@@ -794,33 +815,24 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
         })
       );
       new import_obsidian3.Setting(containerEl).setName(T.settings.spawnCwd_name).setDesc(T.settings.spawnCwd_desc).addText(
-        (t) => (
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          t.setPlaceholder("/tmp").setValue(s.claudeAgent.spawnCwd).onChange(async (v) => {
-            s.claudeAgent.spawnCwd = v.trim() || "/tmp";
-            await this.plugin.saveSettings();
-          })
-        )
+        (t) => t.setPlaceholder("/tmp").setValue(s.claudeAgent.spawnCwd).onChange(async (v) => {
+          s.claudeAgent.spawnCwd = v.trim() || "/tmp";
+          await this.plugin.saveSettings();
+        })
       );
       if (!s.claudeAgent.perOperation) {
         new import_obsidian3.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_claude).addText(
-          (t) => (
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            t.setPlaceholder("sonnet").setValue(s.claudeAgent.model).onChange(async (v) => {
-              s.claudeAgent.model = v.trim();
-              await this.plugin.saveSettings();
-            })
-          )
+          (t) => t.setPlaceholder("sonnet").setValue(s.claudeAgent.model).onChange(async (v) => {
+            s.claudeAgent.model = v.trim();
+            await this.plugin.saveSettings();
+          })
         );
       }
       new import_obsidian3.Setting(containerEl).setName(T.settings.allowedTools_name).setDesc(T.settings.allowedTools_desc).addText(
-        (t) => (
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          t.setPlaceholder("Bash,Read,Write").setValue(s.claudeAgent.allowedTools).onChange(async (v) => {
-            s.claudeAgent.allowedTools = v.trim();
-            await this.plugin.saveSettings();
-          })
-        )
+        (t) => t.setPlaceholder("Bash,Read,Write").setValue(s.claudeAgent.allowedTools).onChange(async (v) => {
+          s.claudeAgent.allowedTools = v.trim();
+          await this.plugin.saveSettings();
+        })
       );
       new import_obsidian3.Setting(containerEl).setName(T.settings.perOperation_name).setDesc(T.settings.perOperation_desc).addToggle(
         (t) => t.setValue(s.claudeAgent.perOperation).onChange(async (v) => {
@@ -848,32 +860,23 @@ var LlmWikiSettingTab = class extends import_obsidian3.PluginSettingTab {
       }
     } else {
       new import_obsidian3.Setting(containerEl).setName(T.settings.baseUrl_name).setDesc(T.settings.baseUrl_desc).addText(
-        (t) => (
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          t.setPlaceholder("http://localhost:11434/v1").setValue(s.nativeAgent.baseUrl).onChange(async (v) => {
-            s.nativeAgent.baseUrl = v.trim();
-            await this.plugin.saveSettings();
-          })
-        )
+        (t) => t.setPlaceholder("http://localhost:11434/v1").setValue(s.nativeAgent.baseUrl).onChange(async (v) => {
+          s.nativeAgent.baseUrl = v.trim();
+          await this.plugin.saveSettings();
+        })
       );
       new import_obsidian3.Setting(containerEl).setName(T.settings.apiKey_name).setDesc(T.settings.apiKey_desc).addText(
-        (t) => (
-          // eslint-disable-next-line obsidianmd/ui/sentence-case
-          t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
-            s.nativeAgent.apiKey = v.trim();
-            await this.plugin.saveSettings();
-          })
-        )
+        (t) => t.setPlaceholder("ollama").setValue(s.nativeAgent.apiKey).onChange(async (v) => {
+          s.nativeAgent.apiKey = v.trim();
+          await this.plugin.saveSettings();
+        })
       );
       if (!s.nativeAgent.perOperation) {
         new import_obsidian3.Setting(containerEl).setName(T.settings.model_name).setDesc(T.settings.model_desc_native).addText(
-          (t) => (
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
-              s.nativeAgent.model = v.trim();
-              await this.plugin.saveSettings();
-            })
-          )
+          (t) => t.setPlaceholder("llama3.2").setValue(s.nativeAgent.model).onChange(async (v) => {
+            s.nativeAgent.model = v.trim();
+            await this.plugin.saveSettings();
+          })
         );
         new import_obsidian3.Setting(containerEl).setName(T.settings.numCtx_name).setDesc(T.settings.numCtx_desc).addText(
           (t) => t.setPlaceholder("(\u0434\u0435\u0444\u043E\u043B\u0442 \u043C\u043E\u0434\u0435\u043B\u0438)").setValue(s.nativeAgent.numCtx != null ? String(s.nativeAgent.numCtx) : "").onChange(async (v) => {
@@ -976,6 +979,17 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
   initBtn;
   ingestBtn;
   lintBtn;
+  fixChatEl = null;
+  lastLint = null;
+  // Chat state
+  chatSection = null;
+  chatMessagesEl = null;
+  chatInputEl = null;
+  chatSendBtn = null;
+  chatHistory = [];
+  currentChatBubble = null;
+  currentChatBuffer = "";
+  lastUserMessage = "";
   startTs = 0;
   toolCount = 0;
   stepCount = 0;
@@ -990,7 +1004,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     return LLM_WIKI_VIEW_TYPE;
   }
   getDisplayText() {
-    return "LLM Wiki";
+    return "LLM wiki";
   }
   getIcon() {
     return "brain-circuit";
@@ -999,34 +1013,24 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     const root = this.containerEl.children[1];
     root.empty();
     root.addClass("llm-wiki-view");
+    const T = i18n();
     const header = root.createDiv("llm-wiki-header");
-    header.createEl("h3", { text: "LLM Wiki" });
+    header.createEl("h3", { text: "LLM wiki" });
     this.statusEl = header.createDiv("llm-wiki-status");
+    root.createDiv({ cls: "llm-wiki-section-label", text: T.view.sectionCreate });
+    const createRow = root.createDiv("llm-wiki-create-row");
+    this.initBtn = createRow.createEl("button", { text: T.view.init, cls: "llm-wiki-init-btn" });
+    this.initBtn.addEventListener("click", () => this.openAddDomain());
+    root.createDiv({ cls: "llm-wiki-section-label", text: T.view.sectionDomain });
     const domainBox = root.createDiv("llm-wiki-domain");
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
     domainRow.createSpan({ cls: "muted", text: "Domain:" });
     this.domainSelect = domainRow.createEl("select", { cls: "llm-wiki-domain-select" });
-    const T = i18n();
     const refreshBtn = domainRow.createEl("button", { text: "\u21BB", attr: { title: T.view.refreshTitle } });
     refreshBtn.addEventListener("click", () => this.refreshDomains());
-    const addBtn = domainRow.createEl("button", { text: T.view.addDomain });
-    addBtn.addEventListener("click", () => this.openAddDomain());
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
-    this.initBtn = actionRow.createEl("button", { text: T.view.init });
     this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
     this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
-    this.domainSelect.addEventListener("change", () => this.updateInitBtn());
-    this.initBtn.addEventListener("click", () => {
-      const d = this.domainSelect.value;
-      if (!d) {
-        new import_obsidian4.Notice(i18n().view.selectDomainForInit);
-        return;
-      }
-      new ConfirmModal(this.plugin.app, "Init \u2014 confirm", [
-        `Domain: \xAB${d}\xBB`,
-        "Claude will generate entity_types and language_notes for the domain."
-      ], () => void this.plugin.controller.init(d, false)).open();
-    });
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
       if (!file) {
@@ -1048,6 +1052,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       ], () => void this.plugin.controller.lint(d || "all")).open();
     });
     this.refreshDomains();
+    root.createDiv({ cls: "llm-wiki-section-label", text: T.view.sectionQuery });
     const ask = root.createDiv("llm-wiki-ask");
     this.queryInput = ask.createEl("textarea", {
       cls: "llm-wiki-query-input",
@@ -1100,20 +1105,6 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     if (previous && Array.from(this.domainSelect.options).some((o) => o.value === previous)) {
       this.domainSelect.value = previous;
     }
-    this.updateInitBtn();
-  }
-  updateInitBtn() {
-    if (this.state === "running")
-      return;
-    const domainId = this.domainSelect.value;
-    if (!domainId) {
-      this.initBtn.disabled = true;
-      return;
-    }
-    const domain = this.plugin.controller.loadDomains().find((d) => d.id === domainId);
-    const isNew = !domain?.entity_types?.length;
-    this.initBtn.disabled = !isNew;
-    this.initBtn.title = isNew ? "" : "Already initialised \u2014 use Lint to update entity_types";
   }
   openAddDomain() {
     const cwd = this.plugin.controller.cwdOrEmpty();
@@ -1134,6 +1125,7 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       if (r.ok) {
         this.refreshDomains();
         this.domainSelect.value = input.id;
+        void this.plugin.controller.init(input.id, false);
       }
     }).open();
   }
@@ -1161,6 +1153,8 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.initBtn.disabled = true;
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
+    this.fixChatEl?.remove();
+    this.fixChatEl = null;
     this.resultSection.addClass("llm-wiki-hidden");
     this.finalEl.empty();
     this.resultOpen = false;
@@ -1274,9 +1268,11 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
     this.cancelBtn.disabled = true;
     this.askBtn.disabled = false;
     this.askSaveBtn.disabled = false;
+    this.initBtn.disabled = false;
     this.ingestBtn.disabled = false;
     this.lintBtn.disabled = false;
-    this.updateInitBtn();
+    this.fixChatEl?.remove();
+    this.fixChatEl = null;
     if (this.tickHandle !== null) {
       window.clearInterval(this.tickHandle);
       this.tickHandle = null;
@@ -1291,8 +1287,88 @@ var LlmWikiView = class extends import_obsidian4.ItemView {
       this.finalEl.removeClass("llm-wiki-hidden");
       this.resultOpen = true;
       this.resultToggle.setText("\u25BC");
+      const domainId = entry.args[0];
+      if (entry.operation === "lint" && entry.status === "done" && domainId) {
+        this.lastLint = { domainId, report: entry.finalText };
+        this.chatHistory = [];
+        this.showChatSection();
+      }
     }
     this.renderHistory();
+  }
+  showChatSection() {
+    this.chatSection?.remove();
+    const T = i18n();
+    this.chatSection = this.resultSection.createDiv("llm-wiki-chat-section");
+    this.chatSection.createDiv({ cls: "llm-wiki-section-label", text: T.view.chatLabel });
+    this.chatMessagesEl = this.chatSection.createDiv("llm-wiki-chat-messages");
+    const inputRow = this.chatSection.createDiv("llm-wiki-chat-input-row");
+    this.chatInputEl = inputRow.createEl("textarea", { cls: "llm-wiki-chat-input", attr: { rows: "2" } });
+    this.chatSendBtn = inputRow.createEl("button", { text: T.view.chatSend, cls: "llm-wiki-chat-send" });
+    const submit = () => {
+      const text = this.chatInputEl.value.trim();
+      if (!text || !this.lastLint)
+        return;
+      this.chatInputEl.value = "";
+      this.addChatBubble("user", text);
+      this.lastUserMessage = text;
+      void this.plugin.controller.lintChat(this.lastLint.domainId, this.lastLint.report, this.chatHistory, text);
+    };
+    this.chatSendBtn.addEventListener("click", submit);
+  }
+  addChatBubble(role, text) {
+    const el = this.chatMessagesEl.createDiv(`llm-wiki-chat-msg llm-wiki-chat-msg--${role}`);
+    if (role === "user") {
+      el.setText(text);
+    } else {
+      void import_obsidian4.MarkdownRenderer.render(this.app, text, el, this.plugin.controller.cwdOrEmpty(), new import_obsidian4.Component());
+    }
+    el.scrollIntoView({ block: "end" });
+    return el;
+  }
+  setChatRunning() {
+    if (this.chatSendBtn)
+      this.chatSendBtn.disabled = true;
+    if (this.chatInputEl)
+      this.chatInputEl.disabled = true;
+    this.currentChatBuffer = "";
+    if (this.chatMessagesEl) {
+      this.currentChatBubble = this.chatMessagesEl.createDiv("llm-wiki-chat-msg llm-wiki-chat-msg--assistant llm-wiki-chat-msg--streaming");
+      this.currentChatBubble.setText("\u2026");
+      this.currentChatBubble.scrollIntoView({ block: "end" });
+    }
+  }
+  appendChatEvent(ev) {
+    if (ev.kind === "assistant_text" && !ev.isReasoning && this.currentChatBubble) {
+      this.currentChatBuffer += ev.delta;
+      this.currentChatBubble.setText(this.currentChatBuffer);
+      this.currentChatBubble.scrollIntoView({ block: "end" });
+    }
+  }
+  finishChat(msg, isError) {
+    if (this.chatSendBtn)
+      this.chatSendBtn.disabled = false;
+    if (this.chatInputEl) {
+      this.chatInputEl.disabled = false;
+      this.chatInputEl.focus();
+    }
+    if (this.currentChatBubble) {
+      this.currentChatBubble.removeClass("llm-wiki-chat-msg--streaming");
+      this.currentChatBubble.empty();
+      if (isError) {
+        this.currentChatBubble.addClass("llm-wiki-chat-msg--error");
+        this.currentChatBubble.setText(msg.content);
+      } else {
+        void import_obsidian4.MarkdownRenderer.render(this.app, msg.content, this.currentChatBubble, this.plugin.controller.cwdOrEmpty(), new import_obsidian4.Component());
+      }
+      this.currentChatBubble = null;
+    }
+    if (!isError && this.lastUserMessage) {
+      this.chatHistory.push({ role: "user", content: this.lastUserMessage });
+      this.chatHistory.push(msg);
+    }
+    this.lastUserMessage = "";
+    this.currentChatBuffer = "";
   }
   toggleHistory() {
     this.historyOpen = !this.historyOpen;
@@ -1484,7 +1560,7 @@ function translateSystemEvent(message) {
 // src/controller.ts
 var import_obsidian5 = require("obsidian");
 var import_node_fs = require("node:fs");
-var import_node_path4 = require("node:path");
+var import_node_path5 = require("node:path");
 
 // src/domain-map.ts
 function validateDomainId(id) {
@@ -2210,6 +2286,195 @@ ${c.slice(0, 300)}`).join("\n\n");
   }
 }
 
+// src/phases/fix.ts
+var import_node_path4 = require("node:path");
+var META_FILES3 = ["_index.md", "_log.md", "_schema.md"];
+async function* runFix(args, vaultTools, llm, model, domains, repoRoot, signal, opts = {}, lintReport, userInstruction) {
+  const domainId = args[0];
+  const domain = domainId ? domains.find((d) => d.id === domainId) : domains[0];
+  if (!domain) {
+    yield { kind: "error", message: domainId ? `Domain "${domainId}" not found.` : "No domains configured." };
+    return;
+  }
+  const absWiki = (0, import_node_path4.isAbsolute)(domain.wiki_folder) ? domain.wiki_folder : (0, import_node_path4.join)(repoRoot, domain.wiki_folder);
+  const wikiVaultPath = vaultTools.toVaultPath(absWiki);
+  if (!wikiVaultPath) {
+    yield { kind: "error", message: `Wiki folder ${domain.wiki_folder} is outside the vault.` };
+    return;
+  }
+  yield { kind: "tool_use", name: "Glob", input: { pattern: `${wikiVaultPath}/**/*.md` } };
+  const allFiles = await vaultTools.listFiles(wikiVaultPath);
+  const files = allFiles.filter((f) => !META_FILES3.some((m) => f.endsWith(m)));
+  yield { kind: "tool_result", ok: true, preview: `${files.length} pages` };
+  if (files.length === 0) {
+    const start2 = Date.now();
+    yield { kind: "result", durationMs: Date.now() - start2, text: "No wiki pages to fix." };
+    return;
+  }
+  const pages = await vaultTools.readAll(files);
+  const structuralIssues = checkStructure(pages);
+  const entityTypesBlock = domain.entity_types?.length ? domain.entity_types.map((et) => `- ${et.type}: ${et.description}`).join("\n") : "";
+  yield { kind: "assistant_text", delta: `Fixing wiki pages for domain "${domain.id}"...
+` };
+  const start = Date.now();
+  const messages = buildFixMessages2(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport, userInstruction);
+  const params = buildChatParams(model, messages, opts);
+  let fullText = "";
+  try {
+    const stream = await llm.chat.completions.create(
+      { ...params, stream: true },
+      { signal }
+    );
+    for await (const chunk of stream) {
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning)
+        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) {
+        fullText += content;
+        yield { kind: "assistant_text", delta: content };
+      }
+    }
+  } catch (e) {
+    if (signal.aborted || e.name === "AbortError")
+      return;
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false }
+    );
+    fullText = resp.choices[0]?.message?.content ?? "";
+    if (fullText)
+      yield { kind: "assistant_text", delta: fullText };
+  }
+  if (signal.aborted)
+    return;
+  const fixedPages = parseJsonPages(fullText);
+  const writtenPaths = [];
+  const errors = [];
+  for (const page of fixedPages) {
+    yield { kind: "tool_use", name: "Write", input: { path: page.path } };
+    try {
+      await vaultTools.write(page.path, page.content);
+      writtenPaths.push(page.path);
+      yield { kind: "tool_result", ok: true };
+    } catch (e) {
+      errors.push(`${page.path}: ${e.message}`);
+      yield { kind: "tool_result", ok: false, preview: e.message };
+    }
+  }
+  const summary = buildFixSummary(domain.id, writtenPaths, errors, structuralIssues, lintReport);
+  yield { kind: "result", durationMs: Date.now() - start, text: summary };
+}
+function buildFixSummary(domainId, writtenPaths, errors, structuralIssues, lintReport) {
+  const lines = [];
+  const source = lintReport ? "lint-\u043E\u0442\u0447\u0451\u0442\u0430" : "\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u043E\u0433\u043E \u0430\u043D\u0430\u043B\u0438\u0437\u0430";
+  if (writtenPaths.length > 0) {
+    lines.push(`\u0418\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E ${writtenPaths.length} \u0441\u0442\u0440. \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domainId}\xBB \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${source}:`);
+    for (const p of writtenPaths) {
+      const name = p.split("/").pop() ?? p;
+      lines.push(`  \u2022 ${name}`);
+    }
+  } else {
+    lines.push(`\u0414\u043E\u043C\u0435\u043D \xAB${domainId}\xBB: \u043F\u0440\u0430\u0432\u043A\u0438 \u043D\u0435 \u043F\u043E\u0442\u0440\u0435\u0431\u043E\u0432\u0430\u043B\u0438\u0441\u044C (\u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${source}).`);
+  }
+  if (errors.length > 0) {
+    lines.push(`
+\u041E\u0448\u0438\u0431\u043A\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 (${errors.length}):`);
+    for (const e of errors)
+      lines.push(`  \u2716 ${e}`);
+  }
+  if (structuralIssues) {
+    lines.push(`
+\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0435 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B:
+${structuralIssues}`);
+  } else {
+    lines.push("\n\u0421\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043E\u0431\u043D\u0430\u0440\u0443\u0436\u0435\u043D\u043E.");
+  }
+  return lines.join("\n");
+}
+function buildFixMessages2(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport, userInstruction) {
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const pagesBlock = [...pages.entries()].map(([p, c]) => `--- ${p} ---
+${c}`).join("\n\n");
+  return [
+    {
+      role: "system",
+      content: [
+        `\u0422\u044B \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name}\xBB.`,
+        userInstruction ? `\u0412\u044B\u043F\u043E\u043B\u043D\u0438 \u0437\u0430\u0434\u0430\u0447\u0443 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F. \u0412\u0435\u0440\u043D\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.` : `\u0418\u0441\u043F\u0440\u0430\u0432\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B \u0432 wiki-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430\u0445 \u0438 \u0432\u0435\u0440\u043D\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B.`,
+        ``,
+        entityTypesBlock ? `\u0422\u0418\u041F\u042B \u0421\u0423\u0429\u041D\u041E\u0421\u0422\u0415\u0419:
+${entityTypesBlock}
+` : "",
+        `\u0412\u0435\u0440\u043D\u0438 \u0422\u041E\u041B\u042C\u041A\u041E JSON-\u043C\u0430\u0441\u0441\u0438\u0432 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u0430\u043D\u0438\u0446 (\u0435\u0441\u043B\u0438 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043D\u0435 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0430\u0441\u044C \u2014 \u043D\u0435 \u0432\u043A\u043B\u044E\u0447\u0430\u0439):`,
+        `[{"path":"${wikiVaultPath}/EntityName.md","content":"\u043F\u043E\u043B\u043D\u044B\u0439 \u043A\u043E\u043D\u0442\u0435\u043D\u0442 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B"}]`,
+        `\u0414\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u044B\u0435 \u043F\u0443\u0442\u0438 wiki: ${wikiVaultPath}/`,
+        `\u0414\u0430\u0442\u0430: ${today}`
+      ].filter(Boolean).join("\n")
+    },
+    {
+      role: "user",
+      content: [
+        userInstruction ? `\u0417\u0410\u0414\u0410\u0427\u0410:
+${userInstruction}` : "",
+        lintReport ? `
+\u041E\u0422\u0427\u0401\u0422 LINT:
+${lintReport}` : "",
+        structuralIssues ? `
+\u0421\u0422\u0420\u0423\u041A\u0422\u0423\u0420\u041D\u042B\u0415 \u041F\u0420\u041E\u0411\u041B\u0415\u041C\u042B:
+${structuralIssues}` : "",
+        `
+WIKI-\u0421\u0422\u0420\u0410\u041D\u0418\u0426\u042B \u0434\u043E\u043C\u0435\u043D\u0430 ${domain.id}:
+${pagesBlock}`
+      ].filter(Boolean).join("\n")
+    }
+  ];
+}
+
+// src/phases/chat.ts
+async function* runLintChat(llm, model, domain, signal, opts, lintReport, history) {
+  const start = Date.now();
+  const systemContent = [
+    domain ? `\u0422\u044B \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0434\u043E\u043C\u0435\u043D\u0430 \xAB${domain.name || domain.id}\xBB.` : `\u0422\u044B \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 wiki-\u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439.`,
+    `\u041F\u043E\u043C\u043E\u0433\u0430\u0439 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044E \u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0438 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u044C \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u044B, \u0432\u044B\u044F\u0432\u043B\u0435\u043D\u043D\u044B\u0435 lint-\u043F\u0440\u043E\u0432\u0435\u0440\u043A\u043E\u0439.`,
+    `\u041E\u0442\u0432\u0435\u0447\u0430\u0439 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u043E, \u0441\u0441\u044B\u043B\u0430\u044F\u0441\u044C \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u0438 \u0441\u0443\u0449\u043D\u043E\u0441\u0442\u0438 \u0438\u0437 \u043E\u0442\u0447\u0451\u0442\u0430.`,
+    ``,
+    `\u041E\u0422\u0427\u0401\u0422 LINT:
+${lintReport}`
+  ].join("\n");
+  const messages = [
+    { role: "system", content: systemContent },
+    ...history.map((m) => ({ role: m.role, content: m.content }))
+  ];
+  const params = buildChatParams(model, messages, opts);
+  let fullText = "";
+  try {
+    const stream = await llm.chat.completions.create(
+      { ...params, stream: true },
+      { signal }
+    );
+    for await (const chunk of stream) {
+      const { reasoning, content } = extractStreamDeltas(chunk);
+      if (reasoning)
+        yield { kind: "assistant_text", delta: reasoning, isReasoning: true };
+      if (content) {
+        fullText += content;
+        yield { kind: "assistant_text", delta: content };
+      }
+    }
+  } catch (e) {
+    if (signal.aborted || e.name === "AbortError")
+      return;
+    const resp = await llm.chat.completions.create(
+      { ...params, stream: false }
+    );
+    fullText = resp.choices[0]?.message?.content ?? "";
+    if (fullText)
+      yield { kind: "assistant_text", delta: fullText };
+  }
+  if (signal.aborted)
+    return;
+  yield { kind: "result", durationMs: Date.now() - start, text: fullText };
+}
+
 // src/phases/init.ts
 async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultName, signal, opts = {}) {
   const domainId = args[0];
@@ -2219,8 +2484,8 @@ async function* runInit(args, vaultTools, llm, model, domains, repoRoot, vaultNa
     return;
   }
   const existing = domains.find((d) => d.id === domainId);
-  if (existing) {
-    yield { kind: "error", message: `Domain "${domainId}" already exists in domain-map.` };
+  if (existing?.entity_types?.length) {
+    yield { kind: "error", message: `Domain "${domainId}" already initialised. Use Lint to update entity_types.` };
     return;
   }
   yield { kind: "assistant_text", delta: `Bootstrapping domain "${domainId}"...
@@ -2317,8 +2582,12 @@ ${JSON.stringify(entry, null, 2)}
     };
     return;
   }
-  yield { kind: "tool_use", name: "SaveDomain", input: { id: entry.id } };
-  yield { kind: "domain_created", entry };
+  yield { kind: "tool_use", name: existing ? "UpdateDomain" : "SaveDomain", input: { id: entry.id } };
+  if (existing) {
+    yield { kind: "domain_updated", domainId: entry.id, patch: { entity_types: entry.entity_types, language_notes: entry.language_notes } };
+  } else {
+    yield { kind: "domain_created", entry };
+  }
   yield { kind: "tool_result", ok: true };
   await appendLog2(vaultTools, wikiRootGuess, domainId);
   yield {
@@ -2358,20 +2627,18 @@ var AgentRunner = class {
     this.domains = domains;
   }
   buildOptsFor(op) {
-    const key = op === "query-save" ? "query" : op;
+    const key = op === "query-save" ? "query" : op === "fix" || op === "chat" ? "lint" : op;
     const s = this.settings;
     if (s.backend === "claude-agent") {
-      if (s.claudeAgent.perOperation) {
-        const c = s.claudeAgent.operations[key];
-        return { model: c.model, opts: { maxTokens: c.maxTokens, systemPrompt: s.systemPrompt } };
-      }
+      const c2 = s.claudeAgent.perOperation ? s.claudeAgent.operations[key] : void 0;
+      if (c2)
+        return { model: c2.model, opts: { maxTokens: c2.maxTokens, systemPrompt: s.systemPrompt } };
       return { model: s.claudeAgent.model, opts: { maxTokens: s.maxTokens, systemPrompt: s.systemPrompt } };
     }
     const na = s.nativeAgent;
-    if (na.perOperation) {
-      const c = na.operations[key];
+    const c = na.perOperation ? na.operations[key] : void 0;
+    if (c)
       return { model: c.model, opts: { maxTokens: c.maxTokens, temperature: c.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
-    }
     return { model: na.model, opts: { maxTokens: s.maxTokens, temperature: na.temperature, topP: na.topP, numCtx: na.numCtx, systemPrompt: s.systemPrompt } };
   }
   async *run(req) {
@@ -2394,6 +2661,14 @@ var AgentRunner = class {
       case "lint":
         yield* runLint(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts);
         break;
+      case "fix":
+        yield* runFix(req.args, this.vaultTools, this.llm, model, domains, repoRoot, req.signal, opts, req.context, req.instruction);
+        break;
+      case "chat": {
+        const domain = req.domainId ? this.domains.find((d) => d.id === req.domainId) : void 0;
+        yield* runLintChat(this.llm, model, domain, req.signal, opts, req.context ?? "", req.chatMessages ?? []);
+        break;
+      }
       case "init":
         yield* runInit(req.args, this.vaultTools, this.llm, model, domains, repoRoot, this.vaultName, req.signal, opts);
         break;
@@ -2667,8 +2942,9 @@ var ClaudeCliClient = class {
       if (spawnError)
         throw new Error(`claude spawn failed: ${spawnError.message}${stderr() ? `
 ${stderr()}` : ""}`);
-      if (exitCode !== null && exitCode !== 0)
-        throw new Error(`claude exited with code ${exitCode}${stderr() ? `
+      const ec = exitCode;
+      if (ec !== null && ec !== 0)
+        throw new Error(`claude exited with code ${ec}${stderr() ? `
 ${stderr()}` : ""}`);
       if (timedOut)
         throw new Error(`claude process timed out after ${timeoutSec}s`);
@@ -9892,6 +10168,62 @@ var WikiController = class {
     const args = domain === "all" ? [] : [domain];
     await this.dispatch("lint", args);
   }
+  async fix(domainId, lintReport, instruction) {
+    await this.dispatch("fix", [domainId], domainId, lintReport, instruction);
+  }
+  async lintChat(domainId, lintReport, history, newMessage) {
+    const chatMessages = [...history, { role: "user", content: newMessage }];
+    await this.dispatchChat(domainId, lintReport, chatMessages);
+  }
+  async dispatchChat(domainId, lintReport, chatMessages) {
+    if (this.isBusy()) {
+      new import_obsidian5.Notice(i18n().ctrl.operationRunning);
+      return;
+    }
+    if (this.plugin.settings.backend === "claude-agent" && !this.requireClaudeAgent())
+      return;
+    await this.ensureView();
+    const view = this.activeView();
+    if (!view)
+      return;
+    const vaultBasePath = this.app.vault.adapter.getBasePath?.() ?? "";
+    const vaultName = this.app.vault.getName();
+    const vaultSuffix = `/vaults/${vaultName}`;
+    const repoRoot = vaultBasePath.endsWith(vaultSuffix) ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length) : vaultBasePath;
+    const agentRunner = this.buildAgentRunner(repoRoot);
+    const ctrl = new AbortController();
+    this.current = ctrl;
+    const startedAt = Date.now();
+    let finalText = "";
+    let status = "done";
+    view.setChatRunning();
+    const timeoutMs = this.plugin.settings.timeouts.lint * 1e3;
+    const runGen = agentRunner.run({
+      operation: "chat",
+      args: [],
+      cwd: repoRoot,
+      signal: ctrl.signal,
+      timeoutMs,
+      domainId,
+      context: lintReport,
+      chatMessages
+    });
+    try {
+      for await (const ev of runGen) {
+        view.appendChatEvent(ev);
+        if (ev.kind === "result")
+          finalText = ev.text;
+        if (ev.kind === "error")
+          status = "error";
+      }
+    } catch (err) {
+      status = "error";
+      finalText = i18n().ctrl.errorPrefix(err.message);
+    } finally {
+      this.current = null;
+    }
+    view.finishChat({ role: "assistant", content: finalText }, status !== "done");
+  }
   async init(domain, dryRun) {
     const args = dryRun ? [domain, "--dry-run"] : [domain];
     await this.dispatch("init", args);
@@ -9963,14 +10295,14 @@ var WikiController = class {
     try {
       const stat = (0, import_node_fs.existsSync)(logPath) ? (0, import_node_fs.statSync)(logPath) : null;
       if (stat?.isDirectory() || !logPath.includes(".") && !logPath.endsWith("/")) {
-        logPath = (0, import_node_path4.join)(logPath, "agent.jsonl");
+        logPath = (0, import_node_path5.join)(logPath, "agent.jsonl");
       }
       const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), session: sessionId, op, domainId, event: ev }) + "\n";
       (0, import_node_fs.appendFileSync)(logPath, line, "utf-8");
     } catch {
     }
   }
-  async dispatch(op, args, domainId) {
+  async dispatch(op, args, domainId, context, instruction) {
     if (this.isBusy()) {
       new import_obsidian5.Notice(i18n().ctrl.operationRunning);
       return;
@@ -9995,8 +10327,9 @@ var WikiController = class {
     let status = "done";
     this.logEvent(sessionId, op, domainId, { kind: "system", message: `start op=${op} args=${JSON.stringify(args)} domainId=${domainId ?? ""}` });
     view.setRunning(op, args);
-    const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1e3;
-    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
+    const opKey = op === "query-save" ? "query" : op;
+    const timeoutMs = this.plugin.settings.timeouts[opKey] * 1e3;
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId, context, instruction });
     try {
       for await (const ev of runGen) {
         this.logEvent(sessionId, op, domainId, ev);
@@ -10097,9 +10430,9 @@ var WikiController = class {
     return view instanceof LlmWikiView ? view : null;
   }
   toVaultPath(vaultDir, savedPath) {
-    const abs = (0, import_node_path4.isAbsolute)(savedPath) ? savedPath : (0, import_node_path4.join)(vaultDir, savedPath);
-    const rel = (0, import_node_path4.relative)(vaultDir, abs);
-    if (rel.startsWith("..") || (0, import_node_path4.isAbsolute)(rel))
+    const abs = (0, import_node_path5.isAbsolute)(savedPath) ? savedPath : (0, import_node_path5.join)(vaultDir, savedPath);
+    const rel = (0, import_node_path5.relative)(vaultDir, abs);
+    if (rel.startsWith("..") || (0, import_node_path5.isAbsolute)(rel))
       return null;
     return rel;
   }
@@ -10113,7 +10446,7 @@ var LlmWikiPlugin = class extends import_obsidian6.Plugin {
     await this.loadSettings();
     this.controller = new WikiController(this.app, this);
     this.registerView(LLM_WIKI_VIEW_TYPE, (leaf) => new LlmWikiView(leaf, this));
-    this.addRibbonIcon("brain-circuit", "LLM Wiki", () => {
+    this.addRibbonIcon("brain-circuit", "LLM wiki", () => {
       const leaves = this.app.workspace.getLeavesOfType(LLM_WIKI_VIEW_TYPE);
       if (leaves.length > 0) {
         void this.app.workspace.revealLeaf(leaves[0]);

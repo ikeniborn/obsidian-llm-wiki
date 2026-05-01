@@ -6,7 +6,14 @@ export type WikiOperation =
   | "query"
   | "query-save"
   | "lint"
+  | "fix"
+  | "chat"
   | "init";
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 export type WikiDomain = string;
 
@@ -17,6 +24,9 @@ export interface RunRequest {
   signal: AbortSignal;
   timeoutMs: number;
   domainId?: string;
+  context?: string;
+  instruction?: string;
+  chatMessages?: ChatMessage[];
 }
 
 export type RunEvent =
@@ -92,6 +102,7 @@ export interface LlmWikiPluginSettings {
     ingest: number;
     query: number;
     lint: number;
+    fix: number;
     init: number;
   };
   history: RunHistoryEntry[];
@@ -122,7 +133,7 @@ export const DEFAULT_SETTINGS: LlmWikiPluginSettings = {
   maxTokens: 4096,
   agentLogPath: "",
   historyLimit: 20,
-  timeouts: { ingest: 300, query: 300, lint: 900, init: 3600 },
+  timeouts: { ingest: 300, query: 300, lint: 900, fix: 900, init: 3600 },
   history: [],
   claudeAgent: {
     iclaudePath: "",

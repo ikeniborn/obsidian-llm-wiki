@@ -6,6 +6,7 @@ import { validateDomainId, type DomainEntry, type AddDomainInput } from "./domai
 import type LlmWikiPlugin from "./main";
 import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
 import { AgentRunner } from "./agent-runner";
+import type { ChatMessage } from "./types";
 import { VaultTools, type VaultAdapter } from "./vault-tools";
 import { ClaudeCliClient } from "./claude-cli-client";
 import OpenAI from "openai";
@@ -40,6 +41,62 @@ export class WikiController {
   async lint(domain: string): Promise<void> {
     const args = domain === "all" ? [] : [domain];
     await this.dispatch("lint", args);
+  }
+
+  async fix(domainId: string, lintReport: string, instruction: string): Promise<void> {
+    await this.dispatch("fix", [domainId], domainId, lintReport, instruction);
+  }
+
+  async lintChat(domainId: string, lintReport: string, history: ChatMessage[], newMessage: string): Promise<void> {
+    const chatMessages: ChatMessage[] = [...history, { role: "user", content: newMessage }];
+    await this.dispatchChat(domainId, lintReport, chatMessages);
+  }
+
+  private async dispatchChat(domainId: string, lintReport: string, chatMessages: ChatMessage[]): Promise<void> {
+    if (this.isBusy()) { new Notice(i18n().ctrl.operationRunning); return; }
+    if (this.plugin.settings.backend === "claude-agent" && !this.requireClaudeAgent()) return;
+
+    await this.ensureView();
+    const view = this.activeView();
+    if (!view) return;
+
+    const vaultBasePath = (this.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.() ?? "";
+    const vaultName = this.app.vault.getName();
+    const vaultSuffix = `/vaults/${vaultName}`;
+    const repoRoot = vaultBasePath.endsWith(vaultSuffix)
+      ? vaultBasePath.slice(0, vaultBasePath.length - vaultSuffix.length)
+      : vaultBasePath;
+
+    const agentRunner = this.buildAgentRunner(repoRoot);
+    const ctrl = new AbortController();
+    this.current = ctrl;
+
+    const startedAt = Date.now();
+    let finalText = "";
+    let status: "done" | "error" | "cancelled" = "done";
+
+    view.setChatRunning();
+
+    const timeoutMs = this.plugin.settings.timeouts.lint * 1000;
+    const runGen = agentRunner.run({
+      operation: "chat", args: [], cwd: repoRoot,
+      signal: ctrl.signal, timeoutMs, domainId, context: lintReport, chatMessages,
+    });
+
+    try {
+      for await (const ev of runGen) {
+        view.appendChatEvent(ev);
+        if (ev.kind === "result") finalText = ev.text;
+        if (ev.kind === "error") status = "error";
+      }
+    } catch (err) {
+      status = "error";
+      finalText = i18n().ctrl.errorPrefix((err as Error).message);
+    } finally {
+      this.current = null;
+    }
+
+    view.finishChat({ role: "assistant", content: finalText }, status !== "done");
   }
 
   async init(domain: string, dryRun: boolean): Promise<void> {
@@ -126,7 +183,7 @@ export class WikiController {
     } catch { /* не блокируем операцию */ }
   }
 
-  private async dispatch(op: WikiOperation, args: string[], domainId?: string): Promise<void> {
+  private async dispatch(op: WikiOperation, args: string[], domainId?: string, context?: string, instruction?: string): Promise<void> {
     if (this.isBusy()) {
       new Notice(i18n().ctrl.operationRunning);
       return;
@@ -159,8 +216,9 @@ export class WikiController {
     this.logEvent(sessionId, op, domainId, { kind: "system", message: `start op=${op} args=${JSON.stringify(args)} domainId=${domainId ?? ""}` });
     view.setRunning(op, args);
 
-    const timeoutMs = this.plugin.settings.timeouts[op === "query-save" ? "query" : op] * 1000;
-    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId });
+    const opKey = op === "query-save" ? "query" : op;
+    const timeoutMs = this.plugin.settings.timeouts[opKey as keyof typeof this.plugin.settings.timeouts] * 1000;
+    const runGen = agentRunner.run({ operation: op, args, cwd: repoRoot, signal: ctrl.signal, timeoutMs, domainId, context, instruction });
 
     try {
       for await (const ev of runGen) {

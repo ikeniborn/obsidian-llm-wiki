@@ -1,7 +1,7 @@
 import { App, ItemView, Modal, WorkspaceLeaf, MarkdownRenderer, Component, Notice } from "obsidian";
 import { AddDomainModal, ConfirmModal } from "./modals";
 import type LlmWikiPlugin from "./main";
-import type { RunEvent, RunHistoryEntry, WikiOperation } from "./types";
+import type { ChatMessage, RunEvent, RunHistoryEntry, WikiOperation } from "./types";
 import { i18n } from "./i18n";
 
 export const LLM_WIKI_VIEW_TYPE = "llm-wiki-view";
@@ -34,6 +34,17 @@ export class LlmWikiView extends ItemView {
   private initBtn!: HTMLButtonElement;
   private ingestBtn!: HTMLButtonElement;
   private lintBtn!: HTMLButtonElement;
+  private fixChatEl: HTMLElement | null = null;
+  private lastLint: { domainId: string; report: string } | null = null;
+  // Chat state
+  private chatSection: HTMLElement | null = null;
+  private chatMessagesEl: HTMLElement | null = null;
+  private chatInputEl: HTMLTextAreaElement | null = null;
+  private chatSendBtn: HTMLButtonElement | null = null;
+  private chatHistory: ChatMessage[] = [];
+  private currentChatBubble: HTMLElement | null = null;
+  private currentChatBuffer = "";
+  private lastUserMessage = "";
   private startTs = 0;
   private toolCount = 0;
   private stepCount = 0;
@@ -50,7 +61,7 @@ export class LlmWikiView extends ItemView {
   }
 
   getViewType(): string { return LLM_WIKI_VIEW_TYPE; }
-  getDisplayText(): string { return "LLM Wiki"; }
+  getDisplayText(): string { return "LLM wiki"; }
   getIcon(): string { return "brain-circuit"; }
 
   onOpen(): void {
@@ -58,36 +69,30 @@ export class LlmWikiView extends ItemView {
     root.empty();
     root.addClass("llm-wiki-view");
 
+    const T = i18n();
+
     const header = root.createDiv("llm-wiki-header");
-    header.createEl("h3", { text: "LLM Wiki" });
+    header.createEl("h3", { text: "LLM wiki" });
     this.statusEl = header.createDiv("llm-wiki-status");
 
-    // Domain selector + per-domain actions
+    // 1. Создание нового домена
+    root.createDiv({ cls: "llm-wiki-section-label", text: T.view.sectionCreate });
+    const createRow = root.createDiv("llm-wiki-create-row");
+    this.initBtn = createRow.createEl("button", { text: T.view.init, cls: "llm-wiki-init-btn" });
+    this.initBtn.addEventListener("click", () => this.openAddDomain());
+
+    // 2+3. Наполнение / Актуализация
+    root.createDiv({ cls: "llm-wiki-section-label", text: T.view.sectionDomain });
     const domainBox = root.createDiv("llm-wiki-domain");
     const domainRow = domainBox.createDiv("llm-wiki-domain-row");
     domainRow.createSpan({ cls: "muted", text: "Domain:" });
     this.domainSelect = domainRow.createEl("select", { cls: "llm-wiki-domain-select" });
-    const T = i18n();
     const refreshBtn = domainRow.createEl("button", { text: "↻", attr: { title: T.view.refreshTitle } });
     refreshBtn.addEventListener("click", () => this.refreshDomains());
-    const addBtn = domainRow.createEl("button", { text: T.view.addDomain });
-    addBtn.addEventListener("click", () => this.openAddDomain());
 
     const actionRow = domainBox.createDiv("llm-wiki-domain-actions");
-    this.initBtn = actionRow.createEl("button", { text: T.view.init });
     this.ingestBtn = actionRow.createEl("button", { text: T.view.ingest });
     this.lintBtn = actionRow.createEl("button", { text: T.view.lint });
-
-    this.domainSelect.addEventListener("change", () => this.updateInitBtn());
-
-    this.initBtn.addEventListener("click", () => {
-      const d = this.domainSelect.value;
-      if (!d) { new Notice(i18n().view.selectDomainForInit); return; }
-      new ConfirmModal(this.plugin.app, "Init — confirm", [
-        `Domain: «${d}»`,
-        "Claude will generate entity_types and language_notes for the domain.",
-      ], () => void this.plugin.controller.init(d, false)).open();
-    });
     this.ingestBtn.addEventListener("click", () => {
       const file = this.plugin.app.workspace.getActiveFile();
       if (!file) { new Notice(i18n().view.noActiveFile); return; }
@@ -107,7 +112,8 @@ export class LlmWikiView extends ItemView {
     });
     this.refreshDomains();
 
-    // Inline query input
+    // 4. Запрос
+    root.createDiv({ cls: "llm-wiki-section-label", text: T.view.sectionQuery });
     const ask = root.createDiv("llm-wiki-ask");
     this.queryInput = ask.createEl("textarea", {
       cls: "llm-wiki-query-input",
@@ -118,7 +124,6 @@ export class LlmWikiView extends ItemView {
     this.askSaveBtn = askRow.createEl("button", { text: T.view.askAndSave });
     this.cancelBtn = askRow.createEl("button", { text: T.view.cancel, cls: "mod-warning" });
     this.cancelBtn.disabled = true;
-
     this.askBtn.addEventListener("click", () => this.submitQuery(false));
     this.askSaveBtn.addEventListener("click", () => this.submitQuery(true));
     this.cancelBtn.addEventListener("click", () => this.plugin.controller.cancelCurrent());
@@ -167,17 +172,6 @@ export class LlmWikiView extends ItemView {
     if (previous && Array.from(this.domainSelect.options).some((o) => o.value === previous)) {
       this.domainSelect.value = previous;
     }
-    this.updateInitBtn();
-  }
-
-  private updateInitBtn(): void {
-    if (this.state === "running") return;
-    const domainId = this.domainSelect.value;
-    if (!domainId) { this.initBtn.disabled = true; return; }
-    const domain = this.plugin.controller.loadDomains().find((d) => d.id === domainId);
-    const isNew = !domain?.entity_types?.length;
-    this.initBtn.disabled = !isNew;
-    this.initBtn.title = isNew ? "" : "Already initialised — use Lint to update entity_types";
   }
 
   private openAddDomain(): void {
@@ -197,6 +191,7 @@ export class LlmWikiView extends ItemView {
       if (r.ok) {
         this.refreshDomains();
         this.domainSelect.value = input.id;
+        void this.plugin.controller.init(input.id, false);
       }
     }).open();
   }
@@ -220,6 +215,8 @@ export class LlmWikiView extends ItemView {
     this.initBtn.disabled = true;
     this.ingestBtn.disabled = true;
     this.lintBtn.disabled = true;
+    this.fixChatEl?.remove();
+    this.fixChatEl = null;
 
     this.resultSection.addClass("llm-wiki-hidden");
     this.finalEl.empty();
@@ -329,9 +326,11 @@ export class LlmWikiView extends ItemView {
     this.cancelBtn.disabled = true;
     this.askBtn.disabled = false;
     this.askSaveBtn.disabled = false;
+    this.initBtn.disabled = false;
     this.ingestBtn.disabled = false;
     this.lintBtn.disabled = false;
-    this.updateInitBtn();
+    this.fixChatEl?.remove();
+    this.fixChatEl = null;
     if (this.tickHandle !== null) { window.clearInterval(this.tickHandle); this.tickHandle = null; }
     this.updateMetrics();
     this.finalEl.empty();
@@ -343,8 +342,89 @@ export class LlmWikiView extends ItemView {
       this.finalEl.removeClass("llm-wiki-hidden");
       this.resultOpen = true;
       this.resultToggle.setText("▼");
+
+      // Чат — только после lint на конкретном домене
+      const domainId = entry.args[0];
+      if (entry.operation === "lint" && entry.status === "done" && domainId) {
+        this.lastLint = { domainId, report: entry.finalText };
+        this.chatHistory = [];
+        this.showChatSection();
+      }
     }
     this.renderHistory();
+  }
+
+  private showChatSection(): void {
+    this.chatSection?.remove();
+    const T = i18n();
+    this.chatSection = this.resultSection.createDiv("llm-wiki-chat-section");
+    this.chatSection.createDiv({ cls: "llm-wiki-section-label", text: T.view.chatLabel });
+    this.chatMessagesEl = this.chatSection.createDiv("llm-wiki-chat-messages");
+    const inputRow = this.chatSection.createDiv("llm-wiki-chat-input-row");
+    this.chatInputEl = inputRow.createEl("textarea", { cls: "llm-wiki-chat-input", attr: { rows: "2" } });
+    this.chatSendBtn = inputRow.createEl("button", { text: T.view.chatSend, cls: "llm-wiki-chat-send" });
+    const submit = () => {
+      const text = this.chatInputEl!.value.trim();
+      if (!text || !this.lastLint) return;
+      this.chatInputEl!.value = "";
+      this.addChatBubble("user", text);
+      this.lastUserMessage = text;
+      void this.plugin.controller.lintChat(this.lastLint.domainId, this.lastLint.report, this.chatHistory, text);
+    };
+    this.chatSendBtn.addEventListener("click", submit);
+  }
+
+  private addChatBubble(role: "user" | "assistant", text: string): HTMLElement {
+    const el = this.chatMessagesEl!.createDiv(`llm-wiki-chat-msg llm-wiki-chat-msg--${role}`);
+    if (role === "user") {
+      el.setText(text);
+    } else {
+      void MarkdownRenderer.render(this.app, text, el, this.plugin.controller.cwdOrEmpty(), new Component());
+    }
+    el.scrollIntoView({ block: "end" });
+    return el;
+  }
+
+  setChatRunning(): void {
+    if (this.chatSendBtn) this.chatSendBtn.disabled = true;
+    if (this.chatInputEl) this.chatInputEl.disabled = true;
+    // Создаём пустой пузырь ассистента — будем стримить в него
+    this.currentChatBuffer = "";
+    if (this.chatMessagesEl) {
+      this.currentChatBubble = this.chatMessagesEl.createDiv("llm-wiki-chat-msg llm-wiki-chat-msg--assistant llm-wiki-chat-msg--streaming");
+      this.currentChatBubble.setText("…");
+      this.currentChatBubble.scrollIntoView({ block: "end" });
+    }
+  }
+
+  appendChatEvent(ev: RunEvent): void {
+    if (ev.kind === "assistant_text" && !ev.isReasoning && this.currentChatBubble) {
+      this.currentChatBuffer += ev.delta;
+      this.currentChatBubble.setText(this.currentChatBuffer);
+      this.currentChatBubble.scrollIntoView({ block: "end" });
+    }
+  }
+
+  finishChat(msg: ChatMessage, isError: boolean): void {
+    if (this.chatSendBtn) this.chatSendBtn.disabled = false;
+    if (this.chatInputEl) { this.chatInputEl.disabled = false; this.chatInputEl.focus(); }
+    if (this.currentChatBubble) {
+      this.currentChatBubble.removeClass("llm-wiki-chat-msg--streaming");
+      this.currentChatBubble.empty();
+      if (isError) {
+        this.currentChatBubble.addClass("llm-wiki-chat-msg--error");
+        this.currentChatBubble.setText(msg.content);
+      } else {
+        void MarkdownRenderer.render(this.app, msg.content, this.currentChatBubble, this.plugin.controller.cwdOrEmpty(), new Component());
+      }
+      this.currentChatBubble = null;
+    }
+    if (!isError && this.lastUserMessage) {
+      this.chatHistory.push({ role: "user", content: this.lastUserMessage });
+      this.chatHistory.push(msg);
+    }
+    this.lastUserMessage = "";
+    this.currentChatBuffer = "";
   }
 
   private toggleHistory(): void {

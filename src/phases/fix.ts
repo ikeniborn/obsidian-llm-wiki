@@ -19,6 +19,7 @@ export async function* runFix(
   signal: AbortSignal,
   opts: LlmCallOptions = {},
   lintReport?: string,
+  userInstruction?: string,
 ): AsyncGenerator<RunEvent> {
   const domainId = args[0];
   const domain = domainId
@@ -58,7 +59,7 @@ export async function* runFix(
   yield { kind: "assistant_text", delta: `Fixing wiki pages for domain "${domain.id}"...\n` };
 
   const start = Date.now();
-  const messages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport);
+  const messages = buildFixMessages(domain, wikiVaultPath, pages, structuralIssues, entityTypesBlock, lintReport, userInstruction);
   const params = buildChatParams(model, messages, opts);
 
   let fullText = "";
@@ -143,6 +144,7 @@ function buildFixMessages(
   structuralIssues: string,
   entityTypesBlock: string,
   lintReport?: string,
+  userInstruction?: string,
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   const today = new Date().toISOString().slice(0, 10);
   const pagesBlock = [...pages.entries()]
@@ -154,27 +156,24 @@ function buildFixMessages(
       role: "system",
       content: [
         `Ты — редактор wiki-базы знаний домена «${domain.name}».`,
-        `Исправь проблемы в wiki-страницах и верни только изменённые страницы.`,
+        userInstruction
+          ? `Выполни задачу пользователя. Верни только изменённые страницы.`
+          : `Исправь проблемы в wiki-страницах и верни только изменённые страницы.`,
         ``,
-        `ПРАВИЛА ИСПРАВЛЕНИЯ:`,
-        `- Мёртвые ссылки [[X]]: убери [[]] оставив текст или замени на корректную ссылку`,
-        `- Отсутствующий frontmatter: добавь минимальный (wiki_updated: ${today}, wiki_status: stub)`,
-        `- Дублирующийся контент: объедини, не теряй информацию`,
-        `- Размытые определения: уточни по контексту домена`,
-        entityTypesBlock ? `\nТИПЫ СУЩНОСТЕЙ:\n${entityTypesBlock}` : "",
-        ``,
+        entityTypesBlock ? `ТИПЫ СУЩНОСТЕЙ:\n${entityTypesBlock}\n` : "",
         `Верни ТОЛЬКО JSON-массив изменённых страниц (если страница не изменилась — не включай):`,
         `[{"path":"${wikiVaultPath}/EntityName.md","content":"полный контент страницы"}]`,
+        `Допустимые пути wiki: ${wikiVaultPath}/`,
+        `Дата: ${today}`,
       ].filter(Boolean).join("\n"),
     },
     {
       role: "user",
       content: [
-        `Домен: ${domain.id} (${domain.name})`,
-        structuralIssues ? `\nСтруктурные проблемы:\n${structuralIssues}` : "\nСтруктурных проблем не обнаружено.",
-        lintReport ? `\nОтчёт Lint (рекомендации к исправлению):\n${lintReport}` : "",
-        ``,
-        `Wiki-страницы:\n${pagesBlock}`,
+        userInstruction ? `ЗАДАЧА:\n${userInstruction}` : "",
+        lintReport ? `\nОТЧЁТ LINT:\n${lintReport}` : "",
+        structuralIssues ? `\nСТРУКТУРНЫЕ ПРОБЛЕМЫ:\n${structuralIssues}` : "",
+        `\nWIKI-СТРАНИЦЫ домена ${domain.id}:\n${pagesBlock}`,
       ].filter(Boolean).join("\n"),
     },
   ];
