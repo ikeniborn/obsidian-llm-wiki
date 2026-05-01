@@ -17,7 +17,7 @@ export default class LlmWikiPlugin extends Plugin {
 
     this.registerView(LLM_WIKI_VIEW_TYPE, (leaf: WorkspaceLeaf) => new LlmWikiView(leaf, this));
 
-    this.addRibbonIcon("brain-circuit", "LLM Wiki", () => {
+    this.addRibbonIcon("brain-circuit", "LLM wiki", () => {
       const leaves = this.app.workspace.getLeavesOfType(LLM_WIKI_VIEW_TYPE);
       if (leaves.length > 0) {
         void this.app.workspace.revealLeaf(leaves[0]);

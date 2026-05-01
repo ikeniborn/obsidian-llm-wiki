@@ -128,7 +128,8 @@ export class ClaudeCliClient implements LlmClient {
       }
       const stderr = () => Buffer.concat(stderrChunks).toString("utf8").trim();
       if (spawnError) throw new Error(`claude spawn failed: ${spawnError.message}${stderr() ? `\n${stderr()}` : ""}`);
-      if (exitCode !== null && exitCode !== 0) throw new Error(`claude exited with code ${exitCode}${stderr() ? `\n${stderr()}` : ""}`);
+      const ec = exitCode;
+      if (ec !== null && ec !== 0) throw new Error(`claude exited with code ${ec}${stderr() ? `\n${stderr()}` : ""}`);
       if (timedOut) throw new Error(`claude process timed out after ${timeoutSec}s`);
       yield {
         id: `cc-${++id}`,
